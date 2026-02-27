@@ -116,6 +116,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         if (!isCamOn && !isMicOn) {
             console.warn('Neither camera nor microphone is requested. Cannot get user media.');
             hasJoined.current = false;
+            socket?.emit('join-room', { roomId, userName });
             return; // Exit the function or block
         }
         if (hasJoined.current) return; // ← Guard: only join once

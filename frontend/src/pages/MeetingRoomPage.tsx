@@ -64,6 +64,7 @@ export default function MeetingRoomPage() {
 
     // Join room after socket is ready
     useEffect(() => {
+        console.log("socket", socket)
         if (socket) {
             joinRoom();
         }

@@ -8,15 +8,13 @@ import './index.css';
 import StoreProvider from './redux/StoreProvider';
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <StoreProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <SocketProvider>
-            <App />
-          </SocketProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </StoreProvider>
-  </StrictMode>,
+  <StoreProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <SocketProvider>
+          <App />
+        </SocketProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  </StoreProvider>
 );
