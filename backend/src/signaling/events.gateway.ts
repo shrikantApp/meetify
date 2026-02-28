@@ -36,8 +36,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
-    // Track which user is in which room: socketId -> { roomId, userId, userName }
-    private participants = new Map<string, { roomId: string; userId: string; userName: string }>();
+    // Track which user is in which room: socketId -> { roomId, userId, userName, mediaState }
+    private participants = new Map<string, {
+        roomId: string;
+        userId: string;
+        userName: string;
+        mediaState: { camera: boolean; mic: boolean; screen: boolean; };
+    }>();
 
     constructor(
         private jwtService: JwtService,
@@ -85,6 +90,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
             roomId: data.roomId,
             userId: user.sub,
             userName: data.userName,
+            mediaState: { camera: false, mic: false, screen: false }
         });
 
         // Tell everyone else in the room a new user joined
@@ -97,7 +103,12 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Send the new user a list of everyone already in the room
         const roomParticipants = Array.from(this.participants.entries())
             .filter(([sid, p]) => p.roomId === data.roomId && sid !== client.id)
-            .map(([sid, p]) => ({ socketId: sid, userId: p.userId, userName: p.userName }));
+            .map(([sid, p]) => ({
+                socketId: sid,
+                userId: p.userId,
+                userName: p.userName,
+                mediaState: p.mediaState
+            }));
 
         client.emit('room-participants', roomParticipants);
     }
@@ -157,6 +168,63 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
             message: data.message,
             userName: data.userName,
             timestamp: new Date().toISOString(),
+        });
+    }
+
+    /** Media State Sync – broadcast the hardware toggle to the room */
+    @SubscribeMessage('media-state-change')
+    handleMediaStateChange(
+        @ConnectedSocket() client: Socket,
+        @MessageBody() data: { roomId: string; type: 'camera' | 'mic' | 'screen'; enabled: boolean },
+    ) {
+        const participant = this.participants.get(client.id);
+        if (participant) {
+            participant.mediaState[data.type] = data.enabled;
+        }
+
+        // Broadcast to everyone else in the room
+        client.to(data.roomId).emit('participant-media-state', {
+            socketId: client.id,
+            type: data.type,
+            enabled: data.enabled,
+        });
+    }
+
+    /** Screen Share Start */
+    @SubscribeMessage('screen-share-start')
+    handleScreenShareStart(
+        @ConnectedSocket() client: Socket,
+        @MessageBody() data: { roomId: string },
+    ) {
+        const participant = this.participants.get(client.id);
+        if (participant) {
+            participant.mediaState.screen = true;
+            participant.mediaState.camera = false; // Visual override during screen share
+        }
+
+        client.to(data.roomId).emit('participant-screen-state', {
+            socketId: client.id,
+            screen: true,
+            camera: false,
+        });
+    }
+
+    /** Screen Share Stop */
+    @SubscribeMessage('screen-share-stop')
+    handleScreenShareStop(
+        @ConnectedSocket() client: Socket,
+        @MessageBody() data: { roomId: string; isCamOn: boolean },
+    ) {
+        const participant = this.participants.get(client.id);
+        if (participant) {
+            participant.mediaState.screen = false;
+            participant.mediaState.camera = data.isCamOn;
+        }
+
+        client.to(data.roomId).emit('participant-screen-state', {
+            socketId: client.id,
+            screen: false,
+            camera: data.isCamOn,
         });
     }
 

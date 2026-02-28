@@ -29,6 +29,7 @@ export default function MeetingRoomPage() {
     const {
         localStream,
         peers,
+        peerMediaStates,
         isMicOn,
         isCamOn,
         isScreenSharing,
@@ -126,23 +127,55 @@ export default function MeetingRoomPage() {
             {/* ── BODY ── */}
             <div className="meeting-body">
                 {/* Video Grid */}
-                <div className={`video-grid ${gridClass}`}>
-                    {/* Local Video */}
-                    <div className="video-tile">
-                        {isCamOn ? (
-                            <video ref={localVideoRef} autoPlay muted playsInline />
-                        ) : (
-                            <div className="avatar-fallback">
-                                {user?.name?.[0]?.toUpperCase() || '?'}
+                <div className={`video-grid ${isScreenSharing || peers.some(p => peerMediaStates[p.socketId]?.screen) ? 'has-screen-share' : gridClass}`}>
+
+                    {/* Render Presenter (Screen Share) */}
+                    {(isScreenSharing || peers.some(p => peerMediaStates[p.socketId]?.screen)) && (
+                        <div className="video-tile presenter">
+                            {isScreenSharing ? (
+                                <video ref={localVideoRef} autoPlay muted playsInline />
+                            ) : (
+                                peers.map(p =>
+                                    peerMediaStates[p.socketId]?.screen ? (
+                                        <RemoteVideo key={`screen-${p.socketId}`} peer={p} mediaState={peerMediaStates[p.socketId]} isPresenter={true} />
+                                    ) : null
+                                )
+                            )}
+                            {isScreenSharing && (
+                                <>
+                                    <div className="screen-share-badge"><Monitor size={12} /> You are sharing</div>
+                                    <div className="participant-name">You ({user?.name})</div>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Wrapper for smaller tiles when screen sharing, or normal grid otherwise */}
+                    <div className={(isScreenSharing || peers.some(p => peerMediaStates[p.socketId]?.screen)) ? 'other-peers' : 'contents'}>
+                        {/* Local Video (If not presenting screen) */}
+                        {!isScreenSharing && (
+                            <div className={`video-tile ${isMicOn ? 'speaking-glow' : ''}`}>
+                                {isCamOn ? (
+                                    <video ref={localVideoRef} autoPlay muted playsInline />
+                                ) : (
+                                    <div className="avatar-fallback">
+                                        {user?.name?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                )}
+                                <div className="participant-name">
+                                    You ({user?.name})
+                                    {!isMicOn && <MicOff size={14} style={{ marginLeft: '6px', color: '#ef4444' }} />}
+                                </div>
                             </div>
                         )}
-                        <div className="participant-name">You ({user?.name})</div>
-                    </div>
 
-                    {/* Remote Peers */}
-                    {peers.map((peer) => (
-                        <RemoteVideo key={peer.socketId} peer={peer} />
-                    ))}
+                        {/* Remote Peers (If not presenting screen) */}
+                        {peers.map((peer) => {
+                            const state = peerMediaStates[peer.socketId] || { camera: false, mic: false, screen: false };
+                            if (state.screen) return null; // Already rendered as presenter
+                            return <RemoteVideo key={peer.socketId} peer={peer} mediaState={state} isPresenter={false} />;
+                        })}
+                    </div>
                 </div>
 
                 {/* Sidebar */}
@@ -252,7 +285,15 @@ export default function MeetingRoomPage() {
 }
 
 /** Separate component to attach remote streams to video elements */
-function RemoteVideo({ peer }: { peer: { socketId: string; userName: string; stream?: MediaStream } }) {
+function RemoteVideo({
+    peer,
+    mediaState,
+    isPresenter
+}: {
+    peer: { socketId: string; userName: string; stream?: MediaStream },
+    mediaState: { camera: boolean; mic: boolean; screen: boolean },
+    isPresenter: boolean
+}) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
@@ -261,14 +302,24 @@ function RemoteVideo({ peer }: { peer: { socketId: string; userName: string; str
         }
     }, [peer.stream]);
 
+    const hasVideo = mediaState.camera || mediaState.screen;
+
     return (
-        <div className="video-tile">
-            {peer.stream ? (
+        <div className={`video-tile ${mediaState.mic && !isPresenter ? 'speaking-glow' : ''}`}>
+            {hasVideo && peer.stream ? (
                 <video ref={videoRef} autoPlay playsInline />
             ) : (
                 <div className="avatar-fallback">{peer.userName?.[0]?.toUpperCase() || '?'}</div>
             )}
-            <div className="participant-name">{peer.userName}</div>
+
+            {isPresenter && (
+                <div className="screen-share-badge"><Monitor size={12} /> {peer.userName}'s Screen</div>
+            )}
+
+            <div className="participant-name">
+                {peer.userName}
+                {!mediaState.mic && <MicOff size={14} style={{ marginLeft: '6px', color: '#ef4444' }} />}
+            </div>
         </div>
     );
 }

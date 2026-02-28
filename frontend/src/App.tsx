@@ -8,14 +8,14 @@ import React from 'react';
 
 function ProtectedRoute({ children }: { children: any }) {
   const { user } = useAuth();
-  return user ? children : <Navigate to="/login" replace />;
+  return user?.id ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
   const { user } = useAuth();
   return (
     <Routes>
-      {!user && (
+      {!user?.id && (
         <React.Fragment>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
