@@ -1,30 +1,83 @@
 import {
+    ConnectedSocket,
+    MessageBody,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
     SubscribeMessage,
     WebSocketGateway,
     WebSocketServer,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    ConnectedSocket,
-    MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
-/**
- * WebRTC Signaling Flow:
- * ─────────────────────────────────────────────────────────
- * 1. User A joins a room → broadcasts 'user-joined' to others
- * 2. User B receives 'user-joined' → creates RTCPeerConnection
- *    → calls getUserMedia → creates SDP offer → sends 'offer'
- * 3. User A receives 'offer' → creates RTCPeerConnection
- *    → creates SDP answer → sends 'answer'
- * 4. Both sides exchange ICE candidates via 'ice-candidate'
- * 5. WebRTC direct P2P connection established 🎉
- * ─────────────────────────────────────────────────────────
- *
- * This gateway uses Socket.IO rooms to scope messages to a meeting.
- */
+type MediaType = 'camera' | 'mic' | 'screen';
+
+type MediaState = {
+    camera: boolean;
+    mic: boolean;
+    screen: boolean;
+};
+
+type ParticipantInfo = {
+    roomId: string;
+    userId: string;
+    userName: string;
+    mediaState: MediaState;
+};
+
+type AuthPayload = {
+    sub: string;
+};
+
+type JoinRoomPayload = {
+    roomId: string;
+    userName: string;
+    mediaState?: MediaState;
+};
+
+type TargetPayload = {
+    targetSocketId: string;
+};
+
+type OfferPayload = TargetPayload & {
+    sdp: RTCSessionDescriptionInit;
+};
+
+type AnswerPayload = TargetPayload & {
+    sdp: RTCSessionDescriptionInit;
+};
+
+type IcePayload = TargetPayload & {
+    candidate: RTCIceCandidateInit;
+};
+
+
+type ChatPayload = {
+    roomId?: string;
+    message: string;
+    userName?: string;
+};
+
+type MediaStatePayload = {
+    roomId: string;
+    type: MediaType;
+    enabled: boolean;
+};
+
+type ScreenShareStartPayload = {
+    roomId: string;
+};
+
+type ScreenShareStopPayload = {
+    roomId: string;
+    isCamOn: boolean;
+};
+
+type AuthenticatedSocket = Socket & {
+    user?: AuthPayload;
+};
+
 @WebSocketGateway({
     cors: {
         origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -36,201 +89,302 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
-    // Track which user is in which room: socketId -> { roomId, userId, userName, mediaState }
-    private participants = new Map<string, {
-        roomId: string;
-        userId: string;
-        userName: string;
-        mediaState: { camera: boolean; mic: boolean; screen: boolean; };
-    }>();
+    private readonly participants = new Map<string, ParticipantInfo>();
 
     constructor(
-        private jwtService: JwtService,
-        private configService: ConfigService,
+        private readonly jwtService: JwtService,
+        private readonly configService: ConfigService,
     ) { }
 
-    /** Validate JWT from socket handshake and attach user info */
-    async handleConnection(client: Socket) {
-        try {
-            const token = client.handshake.auth?.token as string;
-            if (!token) throw new Error('No token');
-            const payload = this.jwtService.verify(token, {
-                secret: this.configService.get('JWT_SECRET'),
+    private isDebugEnabled() {
+        return this.configService.get<string>('SIGNALING_DEBUG') === 'true';
+    }
+
+    private logDebug(message: string, context?: Record<string, unknown>) {
+        if (!this.isDebugEnabled()) return;
+        const details = context ? ` ${JSON.stringify(context)}` : '';
+        console.log(`[signaling] ${message}${details}`);
+    }
+
+    private removeParticipant(
+        client: Socket,
+        reason: 'disconnect' | 'leave-room',
+    ) {
+        const participant = this.participants.get(client.id);
+        if (!participant) return;
+
+        if (reason === 'leave-room') {
+            void client.leave(participant.roomId);
+        }
+
+        client.to(participant.roomId).emit('user-left', {
+            socketId: client.id,
+            userId: participant.userId,
+            userName: participant.userName,
+        });
+
+        this.participants.delete(client.id);
+        this.logDebug('participant removed', {
+            socketId: client.id,
+            roomId: participant.roomId,
+            reason,
+        });
+    }
+
+    private getParticipant(client: Socket, eventName: string) {
+        const participant = this.participants.get(client.id);
+        if (!participant) {
+            this.logDebug('event from socket not in a room', {
+                eventName,
+                socketId: client.id,
             });
-            // Attach decoded token data to socket for later use
-            (client as any).user = payload;
-        } catch {
+            return null;
+        }
+        return participant;
+    }
+
+    private isValidTarget(
+        clientId: string,
+        targetSocketId: string,
+        eventName: string,
+    ) {
+        const sender = this.participants.get(clientId);
+        const target = this.participants.get(targetSocketId);
+
+        if (!sender || !target) {
+            this.logDebug('dropped signal due to missing participant', {
+                eventName,
+                fromSocketId: clientId,
+                targetSocketId,
+            });
+            return false;
+        }
+
+        if (sender.roomId !== target.roomId) {
+            this.logDebug('blocked cross-room signal', {
+                eventName,
+                fromSocketId: clientId,
+                targetSocketId,
+                senderRoom: sender.roomId,
+                targetRoom: target.roomId,
+            });
+            return false;
+        }
+
+        return true;
+    }
+
+    handleConnection(client: Socket) {
+        try {
+            const token = client.handshake.auth?.token as string | undefined;
+            if (!token) throw new Error('missing token');
+
+            const payload = this.jwtService.verify<AuthPayload>(token, {
+                secret: this.configService.get<string>('JWT_SECRET'),
+            });
+
+            (client as AuthenticatedSocket).user = payload;
+            this.logDebug('socket authenticated', {
+                socketId: client.id,
+                userId: payload.sub,
+            });
+        } catch (error) {
+            this.logDebug('socket auth failed', {
+                socketId: client.id,
+                reason: error instanceof Error ? error.message : 'unknown',
+            });
             client.disconnect();
         }
     }
 
-    /** Clean up when a socket disconnects – notify others in the room */
     handleDisconnect(client: Socket) {
-        const info = this.participants.get(client.id);
-        if (info) {
-            client.to(info.roomId).emit('user-left', {
-                socketId: client.id,
-                userId: info.userId,
-                userName: info.userName,
-            });
-            this.participants.delete(client.id);
-        }
+        this.removeParticipant(client, 'disconnect');
     }
 
-    /** Client joins a meeting room */
     @SubscribeMessage('join-room')
     handleJoinRoom(
-        @ConnectedSocket() client: Socket,
-        @MessageBody() data: { roomId: string; userName: string },
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: JoinRoomPayload,
     ) {
-        const user = (client as any).user;
-        client.join(data.roomId);
+        if (!data?.roomId) return;
 
-        this.participants.set(client.id, {
+        if (!client.user?.sub) {
+            client.disconnect();
+            return;
+        }
+
+        // Leaving old room keeps participant bookkeeping consistent on reconnect/join retry.
+        this.removeParticipant(client, 'leave-room');
+        void client.join(data.roomId);
+
+        const participant: ParticipantInfo = {
             roomId: data.roomId,
-            userId: user.sub,
-            userName: data.userName,
-            mediaState: { camera: false, mic: false, screen: false }
-        });
+            userId: client.user.sub,
+            userName: data.userName || 'Guest',
+            mediaState: data.mediaState || { camera: false, mic: false, screen: false },
+        };
 
-        // Tell everyone else in the room a new user joined
+        this.participants.set(client.id, participant);
+
         client.to(data.roomId).emit('user-joined', {
             socketId: client.id,
-            userId: user.sub,
-            userName: data.userName,
+            userId: participant.userId,
+            userName: participant.userName,
+            mediaState: participant.mediaState,
         });
 
-        // Send the new user a list of everyone already in the room
         const roomParticipants = Array.from(this.participants.entries())
-            .filter(([sid, p]) => p.roomId === data.roomId && sid !== client.id)
-            .map(([sid, p]) => ({
-                socketId: sid,
-                userId: p.userId,
-                userName: p.userName,
-                mediaState: p.mediaState
+            .filter(
+                ([socketId, info]) =>
+                    socketId !== client.id && info.roomId === data.roomId,
+            )
+            .map(([socketId, info]) => ({
+                socketId,
+                userId: info.userId,
+                userName: info.userName,
+                mediaState: info.mediaState,
             }));
 
         client.emit('room-participants', roomParticipants);
+        this.logDebug('joined room', {
+            socketId: client.id,
+            roomId: data.roomId,
+            peersInRoom: roomParticipants.length,
+        });
     }
 
-    /** Forward SDP offer to a specific peer */
     @SubscribeMessage('offer')
     handleOffer(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { targetSocketId: string; sdp: RTCSessionDescriptionInit },
+        @MessageBody() data: OfferPayload,
     ) {
+        if (!this.isValidTarget(client.id, data.targetSocketId, 'offer')) return;
+
         this.server.to(data.targetSocketId).emit('offer', {
             sdp: data.sdp,
             fromSocketId: client.id,
         });
     }
 
-    /** Forward SDP answer to a specific peer */
     @SubscribeMessage('answer')
     handleAnswer(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { targetSocketId: string; sdp: RTCSessionDescriptionInit },
+        @MessageBody() data: AnswerPayload,
     ) {
+        if (!this.isValidTarget(client.id, data.targetSocketId, 'answer')) return;
+
         this.server.to(data.targetSocketId).emit('answer', {
             sdp: data.sdp,
             fromSocketId: client.id,
         });
     }
 
-    /** Forward ICE candidate to a specific peer */
     @SubscribeMessage('ice-candidate')
     handleIceCandidate(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { targetSocketId: string; candidate: RTCIceCandidateInit },
+        @MessageBody() data: IcePayload,
     ) {
+        if (!this.isValidTarget(client.id, data.targetSocketId, 'ice-candidate'))
+            return;
+
         this.server.to(data.targetSocketId).emit('ice-candidate', {
             candidate: data.candidate,
             fromSocketId: client.id,
         });
     }
 
-    /** Mute/unmute notification (host control) */
-    @SubscribeMessage('notify-mute')
-    handleMute(
-        @ConnectedSocket() client: Socket,
-        @MessageBody() data: { targetSocketId: string; muted: boolean },
-    ) {
-        this.server.to(data.targetSocketId).emit('force-mute', { muted: data.muted });
-    }
 
-    /** Chat message – broadcast to everyone in the room */
     @SubscribeMessage('chat-message')
     handleChatMessage(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { roomId: string; message: string; userName: string },
+        @MessageBody() data: ChatPayload,
     ) {
-        this.server.to(data.roomId).emit('chat-message', {
+        const participant = this.getParticipant(client, 'chat-message');
+        if (!participant) return;
+
+        if (data.roomId && data.roomId !== participant.roomId) {
+            this.logDebug('chat room mismatch', {
+                socketId: client.id,
+                sentRoom: data.roomId,
+                actualRoom: participant.roomId,
+            });
+            return;
+        }
+
+        this.server.to(participant.roomId).emit('chat-message', {
             message: data.message,
-            userName: data.userName,
+            userName: participant.userName,
             timestamp: new Date().toISOString(),
         });
     }
 
-    /** Media State Sync – broadcast the hardware toggle to the room */
     @SubscribeMessage('media-state-change')
     handleMediaStateChange(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { roomId: string; type: 'camera' | 'mic' | 'screen'; enabled: boolean },
+        @MessageBody() data: MediaStatePayload,
     ) {
-        const participant = this.participants.get(client.id);
-        if (participant) {
-            participant.mediaState[data.type] = data.enabled;
+        const participant = this.getParticipant(client, 'media-state-change');
+        if (!participant) return;
+
+        if (data.roomId !== participant.roomId) {
+            this.logDebug('media-state-change room mismatch', {
+                socketId: client.id,
+                sentRoom: data.roomId,
+                actualRoom: participant.roomId,
+            });
+            return;
         }
 
-        // Broadcast to everyone else in the room
-        client.to(data.roomId).emit('participant-media-state', {
+        participant.mediaState[data.type] = data.enabled;
+        client.to(participant.roomId).emit('participant-media-state', {
             socketId: client.id,
             type: data.type,
             enabled: data.enabled,
         });
     }
 
-    /** Screen Share Start */
     @SubscribeMessage('screen-share-start')
     handleScreenShareStart(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { roomId: string },
+        @MessageBody() data: ScreenShareStartPayload,
     ) {
-        const participant = this.participants.get(client.id);
-        if (participant) {
-            participant.mediaState.screen = true;
-            participant.mediaState.camera = false; // Visual override during screen share
-        }
+        const participant = this.getParticipant(client, 'screen-share-start');
+        if (!participant) return;
 
-        client.to(data.roomId).emit('participant-screen-state', {
+        if (data.roomId !== participant.roomId) return;
+
+        participant.mediaState.screen = true;
+        participant.mediaState.camera = false;
+
+        client.to(participant.roomId).emit('participant-screen-state', {
             socketId: client.id,
             screen: true,
             camera: false,
         });
     }
 
-    /** Screen Share Stop */
     @SubscribeMessage('screen-share-stop')
     handleScreenShareStop(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { roomId: string; isCamOn: boolean },
+        @MessageBody() data: ScreenShareStopPayload,
     ) {
-        const participant = this.participants.get(client.id);
-        if (participant) {
-            participant.mediaState.screen = false;
-            participant.mediaState.camera = data.isCamOn;
-        }
+        const participant = this.getParticipant(client, 'screen-share-stop');
+        if (!participant) return;
 
-        client.to(data.roomId).emit('participant-screen-state', {
+        if (data.roomId !== participant.roomId) return;
+
+        participant.mediaState.screen = false;
+        participant.mediaState.camera = data.isCamOn;
+
+        client.to(participant.roomId).emit('participant-screen-state', {
             socketId: client.id,
             screen: false,
             camera: data.isCamOn,
         });
     }
 
-    /** Leave room explicitly */
     @SubscribeMessage('leave-room')
     handleLeaveRoom(@ConnectedSocket() client: Socket) {
-        this.handleDisconnect(client);
+        this.removeParticipant(client, 'leave-room');
     }
 }

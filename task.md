@@ -23,10 +23,10 @@
 - [ ] Implement unique meeting code generation
 
 ## 5. Signaling Server (Backend - Socket.IO)
-- [ ] Set up WebSockets Gateway in NestJS
-- [ ] Implement room logic (join-room, leave-room)
-- [ ] Implement WebRTC signaling (offer, answer, ice-candidate)
-- [ ] Broadcast events (user-joined, user-left)
+- [x] Set up WebSockets Gateway in NestJS
+- [x] Implement room logic (join-room, leave-room)
+- [x] Implement WebRTC signaling (offer, answer, ice-candidate)
+- [x] Broadcast events (user-joined, user-left)
 
 ## 6. Frontend Setup & UI
 - [ ] Install TailwindCSS (if applicable or standard responsive layout design)
@@ -41,11 +41,11 @@
 - [ ] Create Meeting Room UI (Video grid, controls)
 
 ## 8. WebRTC Integration (Frontend)
-- [ ] Implement custom hook for WebRTC connection
-- [ ] Handle `getUserMedia` (camera, mic)
-- [ ] Handle `getDisplayMedia` (screen sharing)
-- [ ] Integrate WebRTC peer connections with Socket.IO signaling
-- [ ] Handle track adding, peer connection states, and stream rendering
+- [x] Implement custom hook for WebRTC connection
+- [x] Handle `getUserMedia` (camera, mic)
+- [x] Handle `getDisplayMedia` (screen sharing)
+- [x] Integrate WebRTC peer connections with Socket.IO signaling
+- [x] Handle track adding, peer connection states, and stream rendering
 
 ## 9. Final Review & Polish
 - [ ] Ensure all features work cleanly

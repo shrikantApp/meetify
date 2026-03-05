@@ -1,191 +1,165 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Meetify — WebRTC Video Conferencing
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A full-stack video conferencing app built with **NestJS** (backend signaling), **React + TypeScript** (frontend), and **WebRTC** for peer-to-peer media.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Quick Start
 
-## Description
+### Prerequisites
+- Node.js 18+
+- PostgreSQL running (or use Docker Compose)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+### 1. Start the Database
 
 ```bash
-$ npm install
+docker-compose up -d postgres redis
 ```
 
-## Compile and run the project
+### 2. Backend
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cd backend
+cp .env.example .env   # or edit .env directly
+npm install
+npm run start:dev       # http://localhost:3000
 ```
 
-## Run tests
+### 3. Frontend
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cd frontend
+cp .env.example .env   # or edit .env directly
+npm install
+npm run dev             # http://localhost:5173
 ```
 
-## Deployment
+### 4. Test
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Open **two browser tabs** (or an incognito window), log in with different users, and join the same meeting room. Both participants should see and hear each other.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+---
+
+## Environment Variables
+
+### Backend (`.env`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | Server port |
+| `DB_HOST` | `localhost` | PostgreSQL host |
+| `DB_PORT` | `5432` | PostgreSQL port |
+| `DB_USER` | `postgres` | PostgreSQL user |
+| `DB_PASSWORD` | `password` | PostgreSQL password |
+| `DB_NAME` | `meetify` | Database name |
+| `JWT_SECRET` | — | Secret for signing JWTs |
+| `JWT_EXPIRATION` | `7d` | Token expiry |
+| `FRONTEND_URL` | `http://localhost:5173` | CORS origin |
+
+### Frontend (`.env`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_URL` | `http://localhost:3000/api` | Backend API URL |
+| `VITE_SOCKET_URL` | `http://localhost:3000` | Socket.IO URL |
+| `VITE_STUN_URL` | `stun:stun.l.google.com:19302` | STUN server |
+| `VITE_TURN_URL` | *(none)* | TURN server URL |
+| `VITE_TURN_USERNAME` | *(none)* | TURN username |
+| `VITE_TURN_CREDENTIAL` | *(none)* | TURN credential |
+
+---
+
+## TURN Server Setup (Production)
+
+STUN alone fails behind symmetric NATs and corporate firewalls. For production, deploy a TURN server:
+
+1. **Self-hosted**: Install [coturn](https://github.com/coturn/coturn) on a public server.
+2. **Cloud**: Use [Twilio Network Traversal](https://www.twilio.com/stun-turn) or [Xirsys](https://xirsys.com).
+3. Set the `VITE_TURN_*` env vars in the frontend `.env`.
+
+---
+
+## Architecture
+
+### Signaling Flow (Socket.IO)
+
+```
+Joiner (B)                    Server                    Existing (A)
+    │                            │                            │
+    ├── join-room ──────────────►│                            │
+    │                            ├── user-joined ────────────►│
+    │◄── room-participants ──────┤                            │
+    │                            │                            │
+    ├── offer (to A) ──────────►│── offer ──────────────────►│
+    │                            │                            │
+    │◄── answer ─────────────────┤◄── answer (to B) ─────────┤
+    │                            │                            │
+    │◄── ice-candidate ─────────┤◄── ice-candidate ──────────┤
+    ├── ice-candidate ──────────►│── ice-candidate ──────────►│
+    │                            │                            │
+    │         P2P media established                          │
+```
+
+**Key design decision**: Only the **joiner** creates offers. Existing peers create their `RTCPeerConnection` only when they receive an offer. This eliminates dual-offer race conditions.
+
+### Socket Events
+
+| Event | Direction | Payload |
+|---|---|---|
+| `join-room` | Client → Server | `{ roomId, userName }` |
+| `room-participants` | Server → Client | `[{ socketId, userId, userName, mediaState }]` |
+| `user-joined` | Server → Broadcast | `{ socketId, userId, userName }` |
+| `user-left` | Server → Broadcast | `{ socketId, userId, userName }` |
+| `offer` | Client → Server → Client | `{ targetSocketId, sdp }` / `{ fromSocketId, sdp }` |
+| `answer` | Client → Server → Client | `{ targetSocketId, sdp }` / `{ fromSocketId, sdp }` |
+| `ice-candidate` | Client → Server → Client | `{ targetSocketId, candidate }` / `{ fromSocketId, candidate }` |
+| `media-state-change` | Client → Server → Broadcast | `{ roomId, type, enabled }` |
+| `screen-share-start` | Client → Server → Broadcast | `{ roomId }` |
+| `screen-share-stop` | Client → Server → Broadcast | `{ roomId, isCamOn }` |
+| `renegotiate-request` | Client → Server → Client | `{ targetSocketId }` / `{ fromSocketId }` |
+
+---
+
+## Production Notes
+
+### Scaling Beyond 8 Participants
+
+P2P mesh (every peer connects to every other peer) works well for up to ~8 participants but CPU/bandwidth grows as **O(n²)**. For larger rooms, use a **Selective Forwarding Unit (SFU)**:
+
+- **[mediasoup](https://mediasoup.org/)** — Node.js-based, production-proven
+- **[Janus](https://janus.conf.meetecho.com/)** — C-based, very fast
+- **[LiveKit](https://livekit.io/)** — Full platform with SDKs
+
+### Security
+
+- **JWT socket auth** is implemented: the token is passed in `socket.handshake.auth.token` and verified on `handleConnection`.
+- For production, use short-lived tokens and validate the user has permission to join the specific room.
+
+### Multi-Instance Scaling
+
+For horizontal scaling of the NestJS backend, use the **Redis Socket.IO adapter**:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm install @socket.io/redis-adapter redis
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+```typescript
+// main.ts
+import { createAdapter } from '@socket.io/redis-adapter';
+import { createClient } from 'redis';
 
-## Resources
+const pubClient = createClient({ url: 'redis://localhost:6379' });
+const subClient = pubClient.duplicate();
+await Promise.all([pubClient.connect(), subClient.connect()]);
+io.adapter(createAdapter(pubClient, subClient));
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### Network Reliability
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+- **ICE restart**: If `iceConnectionState` becomes `"failed"`, the hook calls `pc.restartIce()` automatically.
+- **`replaceTrack`** is used for camera/mic toggling — no renegotiation needed, so media switches are instant.
+- For severe disconnections, implement exponential backoff reconnection in the Socket.IO client config.
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# React + TypeScript + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+MIT

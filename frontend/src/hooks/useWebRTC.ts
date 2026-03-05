@@ -1,13 +1,44 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 
-const ICE_SERVERS: RTCConfiguration = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-    ],
-};
+// ── ICE SERVER CONFIGURATION ─────────────────────────────────────────────────
+// Reads from env so you can use your own TURN server in production.
+// Falls back to Google's public STUN servers for local dev.
+function buildIceConfig(): RTCConfiguration {
+    const servers: RTCIceServer[] = [];
 
+    const stunUrl = import.meta.env.VITE_STUN_URL || 'stun:stun.l.google.com:19302';
+    servers.push({ urls: stunUrl });
+
+    // Always add a second STUN for redundancy
+    servers.push({ urls: 'stun:stun1.l.google.com:19302' });
+
+    // Optional TURN server (required for symmetric NAT / corporate firewalls)
+    const turnUrl = import.meta.env.VITE_TURN_URL;
+    if (turnUrl) {
+        servers.push({
+            urls: turnUrl,
+            username: import.meta.env.VITE_TURN_USERNAME || '',
+            credential: import.meta.env.VITE_TURN_CREDENTIAL || '',
+        });
+    }
+
+    return { iceServers: servers };
+}
+
+const ICE_SERVERS = buildIceConfig();
+const SIGNALING_DEBUG = import.meta.env.VITE_DEBUG_SIGNALING === 'true';
+
+function debugLog(message: string, payload?: unknown) {
+    if (!SIGNALING_DEBUG) return;
+    if (payload !== undefined) {
+        console.log(message, payload);
+        return;
+    }
+    console.log(message);
+}
+
+// ── TYPE DEFINITIONS ─────────────────────────────────────────────────────────
 export interface PeerMediaState {
     camera: boolean;
     mic: boolean;
@@ -27,6 +58,10 @@ interface UseWebRTCProps {
     userName: string;
 }
 
+// ── HELPER: PLACEHOLDER TRACKS ───────────────────────────────────────────────
+// We always keep 1 audio + 1 video track in the local stream so that
+// pre-created transceivers have something to send from the start.
+
 function createBlackVideoTrack(): MediaStreamTrack {
     const canvas = document.createElement('canvas');
     canvas.width = 640;
@@ -34,7 +69,7 @@ function createBlackVideoTrack(): MediaStreamTrack {
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const stream = (canvas as any).captureStream(1) as MediaStream;
+    const stream = canvas.captureStream(1);
     return stream.getVideoTracks()[0];
 }
 
@@ -45,13 +80,16 @@ function createSilentAudioTrack(): MediaStreamTrack {
     return dst.stream.getAudioTracks()[0];
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// HOOK
+// ══════════════════════════════════════════════════════════════════════════════
 export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [peers, setPeers] = useState<RemotePeer[]>([]);
     const [peerMediaStates, setPeerMediaStates] = useState<Record<string, PeerMediaState>>({});
 
     const [isMicOn, setIsMicOn] = useState(false);
-    const [isCamOn, setIsCamOn] = useState(true);
+    const [isCamOn, setIsCamOn] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
 
     // Core WebRTC refs
@@ -59,73 +97,119 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const localStreamRef = useRef<MediaStream | null>(null);
     const hasJoined = useRef(false);
 
-    // Negotiation state tracking to prevent offer storms and ICE races
+    // Negotiation state tracking (perfect negotiation pattern)
     const pendingCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
     const makingOffer = useRef<Map<string, boolean>>(new Map());
     const ignoreOffer = useRef<Map<string, boolean>>(new Map());
+    const handleMicOffRef = useRef<() => void>(() => undefined);
 
-    /** Emits our hardware availability state to the room */
+    // ── MEDIA STATE BROADCAST ────────────────────────────────────────────────
     const emitMediaState = useCallback((type: 'camera' | 'mic' | 'screen', enabled: boolean) => {
         if (!socket) return;
         socket.emit('media-state-change', { roomId, type, enabled });
     }, [socket, roomId]);
 
-    /** Helper: Safely trigger renegotiation utilizing perfect negotiation pattern */
-    const triggerRenegotiation = useCallback(async (pc: RTCPeerConnection, socketId: string) => {
+    // ── RENEGOTIATION (OFFER CREATION) ───────────────────────────────────────
+    const flushPendingCandidates = useCallback(async (socketId: string, pc: RTCPeerConnection) => {
+        const queue = pendingCandidates.current.get(socketId);
+        if (!queue?.length) return;
+
+        for (const candidate of queue) {
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (error) {
+                console.error(`[WebRTC] Failed to add queued ICE candidate for ${socketId}:`, error);
+            }
+        }
+
+        pendingCandidates.current.delete(socketId);
+    }, []);
+
+    // Called only when a genuine SDP change is needed (e.g. addTrack).
+    // replaceTrack does NOT need this — it swaps media without SDP changes.
+    const triggerRenegotiation = useCallback(async (
+        pc: RTCPeerConnection,
+        socketId: string
+    ) => {
+        if (!socket) return false;
+
+        const isBusy = (makingOffer.current.get(socketId) ?? false) || pc.signalingState !== 'stable';
+        if (isBusy) {
+            debugLog(`[WebRTC] Skipping renegotiation for ${socketId}; signalingState=${pc.signalingState}`);
+            return false;
+        }
+
         try {
-            console.log(`[WebRTC] Negotiation started for peer: ${socketId}`);
+            debugLog(`[WebRTC] Renegotiation started for peer: ${socketId}`);
             makingOffer.current.set(socketId, true);
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            console.log(`[WebRTC] Offer sent to ${socketId}`);
-            socket?.emit('offer', { targetSocketId: socketId, sdp: pc.localDescription });
+            socket.emit('offer', { targetSocketId: socketId, sdp: pc.localDescription });
+            debugLog(`[WebRTC] Renegotiation offer sent to ${socketId}`);
+            return true;
         } catch (e) {
             console.error('[WebRTC] Renegotiation failed:', e);
+            return false;
         } finally {
             makingOffer.current.set(socketId, false);
         }
     }, [socket]);
 
-    /** Helper: create and register a new RTCPeerConnection */
+    // ── CREATE PEER CONNECTION ───────────────────────────────────────────────
+    // Factory for a new RTCPeerConnection wired with event handlers.
     const createPeerConnection = useCallback((remotePeer: RemotePeer): RTCPeerConnection => {
         const pc = new RTCPeerConnection(ICE_SERVERS);
 
-        // 1. PRE-CREATE TRANSCEIVERS
-        // Ensures `replaceTrack` never fails because the underlying WebRTC RTP senders are guaranteed to exist instantly.
+        // 1. PRE-CREATE TRANSCEIVERS so we always have audio+video senders
+        //    ready for replaceTrack. This avoids addTrack→renegotiation churn.
         const streams = localStreamRef.current ? [localStreamRef.current] : [];
         pc.addTransceiver('audio', { direction: 'sendrecv', streams });
         pc.addTransceiver('video', { direction: 'sendrecv', streams });
 
-        // 2. ATTACH EXISTING TRACKS
+        // 2. ATTACH EXISTING LOCAL TRACKS via replaceTrack (no renegotiation)
         localStreamRef.current?.getTracks().forEach((track) => {
             const transceiver = pc.getTransceivers().find(t =>
                 t.sender.track === null && t.receiver.track.kind === track.kind
             );
             if (transceiver) {
-                transceiver.sender.replaceTrack(track);
+                void transceiver.sender.replaceTrack(track).catch((error) => {
+                    console.error(`[WebRTC] Failed to attach initial ${track.kind} track:`, error);
+                });
             } else {
                 pc.addTrack(track, localStreamRef.current!);
             }
         });
 
-        // 3. HANDLE INCOMING TRACKS
+        // 3. HANDLE INCOMING REMOTE TRACKS
+        //    We build a single MediaStream per peer and keep adding/replacing
+        //    tracks on it. React state update triggers re-render.
         pc.ontrack = (event) => {
+            debugLog(`[WebRTC] ontrack from ${remotePeer.socketId}: kind=${event.track.kind}`);
             setPeers((prev) => prev.map((p) => {
                 if (p.socketId === remotePeer.socketId) {
-                    const currentStream = p.stream || event.streams[0] || new MediaStream();
+                    // Reuse existing stream or start a new one
+                    const currentStream = p.stream || new MediaStream();
+
+                    // Remove old track of same kind to replace it cleanly
+                    currentStream.getTracks()
+                        .filter(t => t.kind === event.track.kind && t.id !== event.track.id)
+                        .forEach(t => currentStream.removeTrack(t));
+
                     if (!currentStream.getTracks().includes(event.track)) {
                         currentStream.addTrack(event.track);
                     }
-                    return { ...p, stream: currentStream };
+
+                    // Return a NEW object reference with a NEW MediaStream wrapper
+                    // so React detects the change and <video>.srcObject is re-assigned
+                    return { ...p, stream: new MediaStream(currentStream.getTracks()) };
                 }
                 return p;
             }));
         };
 
-        // 4. ICE CANDIDATES
+        // 4. ICE CANDIDATE FORWARDING
         pc.onicecandidate = (event) => {
             if (event.candidate && socket) {
-                console.log(`[WebRTC] ICE Candidate generated & sent to ${remotePeer.socketId}`);
                 socket.emit('ice-candidate', {
                     targetSocketId: remotePeer.socketId,
                     candidate: event.candidate,
@@ -134,34 +218,46 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         };
 
         // 5. NEGOTIATION NEEDED
+        //    Fires when addTransceiver/addTrack changes the SDP.
+        //    This is the ONLY place offers are created for the initial handshake.
         pc.onnegotiationneeded = () => {
-            console.log(`[WebRTC] onnegotiationneeded triggered for ${remotePeer.socketId}`);
-            triggerRenegotiation(pc, remotePeer.socketId);
+            debugLog(`[WebRTC] onnegotiationneeded for ${remotePeer.socketId}`);
+            void triggerRenegotiation(pc, remotePeer.socketId);
         };
 
-        // 6. DEBUGGING STATE LISTENERS
+        // 6. ICE CONNECTION STATE — restart on failure
+        pc.oniceconnectionstatechange = () => {
+            debugLog(`[WebRTC] ICE state ${remotePeer.socketId}: ${pc.iceConnectionState}`);
+            if (pc.iceConnectionState === 'failed') {
+                console.warn(`[WebRTC] ICE failed for ${remotePeer.socketId}, attempting restart`);
+                pc.restartIce();
+            }
+        };
+
+        // 7. CONNECTION STATE LOGGING
         pc.onconnectionstatechange = () => {
-            console.log(`[WebRTC] Connection state with ${remotePeer.socketId}: ${pc.connectionState}`);
+            debugLog(`[WebRTC] Connection state ${remotePeer.socketId}: ${pc.connectionState}`);
+            if (pc.connectionState === 'connected' && pc.remoteDescription) {
+                void flushPendingCandidates(remotePeer.socketId, pc);
+            }
         };
         pc.onsignalingstatechange = () => {
-            console.log(`[WebRTC] Signaling state with ${remotePeer.socketId}: ${pc.signalingState}`);
-        };
-        pc.oniceconnectionstatechange = () => {
-            console.log(`[WebRTC] ICE connection state with ${remotePeer.socketId}: ${pc.iceConnectionState}`);
+            debugLog(`[WebRTC] Signaling state ${remotePeer.socketId}: ${pc.signalingState}`);
         };
 
         peerConnections.current.set(remotePeer.socketId, pc);
         return pc;
-    }, [socket, triggerRenegotiation]);
+    }, [flushPendingCandidates, socket, triggerRenegotiation]);
 
-    /** Initiate WebRTC connection to a newly joined peer */
+    // ── INITIATE CONNECTION TO A PEER (joiner side only) ─────────────────────
+    // Creates a PeerConnection. The addTransceiver calls inside
+    // createPeerConnection will trigger onnegotiationneeded → offer is sent.
     const callPeer = useCallback(async (remotePeer: RemotePeer) => {
         createPeerConnection(remotePeer);
-        // We do NOT manually trigger renegotiation here anymore.
-        // Adding tracks in `createPeerConnection` triggers `onnegotiationneeded`, 
-        // which will automatically create the offer via `triggerRenegotiation`.
+        // onnegotiationneeded fires automatically from addTransceiver
     }, [createPeerConnection]);
 
+    // ── JOIN ROOM ────────────────────────────────────────────────────────────
     const joinRoom = useCallback(async () => {
         if (hasJoined.current) return;
         hasJoined.current = true;
@@ -178,18 +274,25 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 }
             }
 
-            // Always ensure the local stream has 1 audio and 1 video track to establish receivers for peers.
-            stream.addTrack(userStream && userStream.getAudioTracks().length > 0 ? userStream.getAudioTracks()[0] : createSilentAudioTrack());
-            stream.addTrack(userStream && userStream.getVideoTracks().length > 0 ? userStream.getVideoTracks()[0] : createBlackVideoTrack());
+            // Always have exactly 1 audio + 1 video track (placeholder if needed)
+            stream.addTrack(
+                userStream && userStream.getAudioTracks().length > 0
+                    ? userStream.getAudioTracks()[0]
+                    : createSilentAudioTrack()
+            );
+            stream.addTrack(
+                userStream && userStream.getVideoTracks().length > 0
+                    ? userStream.getVideoTracks()[0]
+                    : createBlackVideoTrack()
+            );
 
             localStreamRef.current = stream;
             setLocalStream(stream);
-            socket?.emit('join-room', { roomId, userName });
-
-            // Broadcast initial state
-            emitMediaState('camera', isCamOn);
-            emitMediaState('mic', isMicOn);
-            emitMediaState('screen', false);
+            socket?.emit('join-room', {
+                roomId,
+                userName,
+                mediaState: { camera: isCamOn, mic: isMicOn, screen: false },
+            });
 
         } catch (err) {
             hasJoined.current = false;
@@ -197,119 +300,154 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         }
     }, [socket, roomId, userName, isCamOn, isMicOn, emitMediaState]);
 
-    // ── SIGNALING EVENT LISTENERS ─────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    //  SIGNALING EVENT LISTENERS
+    // ══════════════════════════════════════════════════════════════════════════
     useEffect(() => {
         if (!socket) return;
 
+        // ── room-participants: joiner receives list of existing users ────────
+        // The JOINER calls callPeer() for each existing user → creates offer.
         socket.on('room-participants', (participants: (RemotePeer & { mediaState: PeerMediaState })[]) => {
+            debugLog(`[WebRTC] Received room-participants: ${participants.length} peers`);
             setPeers(participants);
-            // Initialize accurate media states from backend
+
             const newStates: Record<string, PeerMediaState> = {};
             participants.forEach(p => {
                 newStates[p.socketId] = p.mediaState || { camera: false, mic: false, screen: false };
+                // JOINER creates PeerConnection + sends offer to each existing peer
                 callPeer(p);
             });
             setPeerMediaStates(prev => ({ ...prev, ...newStates }));
         });
 
+        // ── user-joined: existing peer learns a new user joined ─────────────
+        // BUG-1 FIX: Do NOT call callPeer() here. The existing peer must
+        // wait for the incoming offer from the joiner. We only add the peer
+        // to our state so the UI shows them.
         socket.on('user-joined', (newPeer: RemotePeer) => {
-            setPeers((prev) => prev.find((p) => p.socketId === newPeer.socketId) ? prev : [...prev, newPeer]);
-            setPeerMediaStates(prev => ({ ...prev, [newPeer.socketId]: { camera: false, mic: false, screen: false } }));
-            callPeer(newPeer);
+            debugLog(`[WebRTC] user-joined: ${newPeer.userName} (${newPeer.socketId})`);
+            setPeers((prev) =>
+                prev.find((p) => p.socketId === newPeer.socketId) ? prev : [...prev, newPeer]
+            );
+            setPeerMediaStates(prev => ({
+                ...prev,
+                [newPeer.socketId]: { camera: false, mic: false, screen: false },
+            }));
+            // ⛔ NO callPeer here — we wait for their offer
         });
 
-        socket.on('participant-media-state', ({ socketId, type, enabled }: { socketId: string; type: 'camera' | 'mic' | 'screen'; enabled: boolean }) => {
+        // ── Media state updates ─────────────────────────────────────────────
+        socket.on('participant-media-state', ({ socketId, type, enabled }: {
+            socketId: string; type: 'camera' | 'mic' | 'screen'; enabled: boolean;
+        }) => {
             setPeerMediaStates(prev => ({
                 ...prev,
                 [socketId]: {
                     ...(prev[socketId] || { camera: false, mic: false, screen: false }),
-                    [type]: enabled
-                }
+                    [type]: enabled,
+                },
             }));
         });
 
-        socket.on('participant-screen-state', ({ socketId, screen, camera }: { socketId: string; screen: boolean; camera: boolean }) => {
+        socket.on('participant-screen-state', ({ socketId, screen, camera }: {
+            socketId: string; screen: boolean; camera: boolean;
+        }) => {
             setPeerMediaStates(prev => ({
                 ...prev,
                 [socketId]: {
                     ...(prev[socketId] || { camera: false, mic: false, screen: false }),
                     screen,
-                    camera
-                }
+                    camera,
+                },
             }));
         });
 
-        socket.on('offer', async ({ sdp, fromSocketId }: { sdp: RTCSessionDescriptionInit; fromSocketId: string }) => {
+        // ── offer: received from a peer who wants to connect ────────────────
+        socket.on('offer', async ({ sdp, fromSocketId }: {
+            sdp: RTCSessionDescriptionInit; fromSocketId: string;
+        }) => {
             try {
+                debugLog(`[WebRTC] Offer received from ${fromSocketId}`);
                 let pc = peerConnections.current.get(fromSocketId);
                 if (!pc) {
+                    // Existing peer creates PeerConnection only when the joiner's offer arrives
                     const remotePeer: RemotePeer = { socketId: fromSocketId, userId: '', userName: 'Unknown' };
+                    // Also ensure the peer is in the peers list (it should be from user-joined)
+                    setPeers(prev => {
+                        if (prev.find(p => p.socketId === fromSocketId)) return prev;
+                        return [...prev, remotePeer];
+                    });
                     pc = createPeerConnection(remotePeer);
                 }
 
-                // Perfect Negotiation Handling
+                // Perfect Negotiation: polite peer is the one with the "greater" socket id
                 const isPolite = String(socket.id || '') > fromSocketId;
                 const isMakingOffer = makingOffer.current.get(fromSocketId) || false;
-                const offerCollision = (isMakingOffer || pc.signalingState !== 'stable');
-
+                const offerCollision = isMakingOffer || pc.signalingState !== 'stable';
                 const shouldIgnoreOffer = !isPolite && offerCollision;
+
                 ignoreOffer.current.set(fromSocketId, shouldIgnoreOffer);
                 if (shouldIgnoreOffer) {
-                    console.log('Ignored collided offer from', fromSocketId);
+                    debugLog(`[WebRTC] Ignored collided offer from ${fromSocketId}`);
                     return;
                 }
 
-                // If polite and collision, setRemoteDescription will automatically rollback the local offer.
                 await pc.setRemoteDescription(new RTCSessionDescription(sdp));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 socket.emit('answer', { targetSocketId: fromSocketId, sdp: answer });
 
-                // Flush pending candidates now that remote SDP is correctly set
-                const queue = pendingCandidates.current.get(fromSocketId) || [];
-                for (const candidate of queue) pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-                pendingCandidates.current.delete(fromSocketId);
+                await flushPendingCandidates(fromSocketId, pc);
+
             } catch (e) {
-                console.error('Error handling offer:', e);
+                console.error('[WebRTC] Error handling offer:', e);
             }
         });
 
-        socket.on('answer', async ({ sdp, fromSocketId }: { sdp: RTCSessionDescriptionInit; fromSocketId: string }) => {
-            console.log(`[WebRTC] Answer received from ${fromSocketId}`);
+        // ── answer ──────────────────────────────────────────────────────────
+        socket.on('answer', async ({ sdp, fromSocketId }: {
+            sdp: RTCSessionDescriptionInit; fromSocketId: string;
+        }) => {
+            debugLog(`[WebRTC] Answer received from ${fromSocketId}`);
             try {
                 const pc = peerConnections.current.get(fromSocketId);
                 if (pc) {
                     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
 
-                    const queue = pendingCandidates.current.get(fromSocketId) || [];
-                    for (const candidate of queue) pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-                    pendingCandidates.current.delete(fromSocketId);
+                    await flushPendingCandidates(fromSocketId, pc);
                 }
             } catch (e) {
-                console.error('Error handling answer:', e);
+                console.error('[WebRTC] Error handling answer:', e);
             }
         });
 
-        socket.on('ice-candidate', async ({ candidate, fromSocketId }: { candidate: RTCIceCandidateInit; fromSocketId: string }) => {
-            console.log(`[WebRTC] ICE Candidate received from ${fromSocketId}`);
+        // ── ICE candidate ───────────────────────────────────────────────────
+        socket.on('ice-candidate', async ({ candidate, fromSocketId }: {
+            candidate: RTCIceCandidateInit; fromSocketId: string;
+        }) => {
             const pc = peerConnections.current.get(fromSocketId);
-            const isIgnoringOffer = ignoreOffer.current.get(fromSocketId) || false;
-            if (isIgnoringOffer) return;
+            if (ignoreOffer.current.get(fromSocketId)) return;
 
             if (pc && pc.remoteDescription && pc.remoteDescription.type) {
                 pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
             } else {
+                // Queue candidates until remote SDP is set
                 const queue = pendingCandidates.current.get(fromSocketId) || [];
                 queue.push(candidate);
                 pendingCandidates.current.set(fromSocketId, queue);
             }
         });
 
+
+        // ── user-left ───────────────────────────────────────────────────────
         socket.on('user-left', ({ socketId }: { socketId: string }) => {
+            debugLog(`[WebRTC] user-left: ${socketId}`);
             peerConnections.current.get(socketId)?.close();
             peerConnections.current.delete(socketId);
             pendingCandidates.current.delete(socketId);
             makingOffer.current.delete(socketId);
+            ignoreOffer.current.delete(socketId);
             ignoreOffer.current.delete(socketId);
             setPeers((prev) => prev.filter((p) => p.socketId !== socketId));
             setPeerMediaStates((prev) => {
@@ -319,8 +457,9 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             });
         });
 
+        // ── force-mute (host control) ───────────────────────────────────────
         socket.on('force-mute', ({ muted }: { muted: boolean }) => {
-            handleMicOff(muted);
+            if (muted) handleMicOffRef.current();
         });
 
         return () => {
@@ -329,53 +468,68 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             socket.off('offer');
             socket.off('answer');
             socket.off('ice-candidate');
+            socket.off('ice-candidate');
             socket.off('user-left');
             socket.off('force-mute');
             socket.off('participant-media-state');
             socket.off('participant-screen-state');
+            socket.off('participant-screen-state');
         };
-    }, [socket, callPeer, createPeerConnection]);
+    }, [socket, callPeer, createPeerConnection, flushPendingCandidates, triggerRenegotiation]);
 
-    // ── REPLACE A TRACK IN ALL PEER CONNECTIONS ───────────────────────────────
-    const replaceTrackInPeers = async (kind: 'video' | 'audio', newTrack: MediaStreamTrack) => {
+    // ── REPLACE TRACK IN ALL PEER CONNECTIONS ────────────────────────────────
+    // BUG-2 FIX: replaceTrack does NOT require renegotiation. It swaps the
+    // underlying media without changing the SDP. We only renegotiate if we
+    // had to fall back to addTrack (which DOES change the SDP).
+    const replaceTrackInPeers = useCallback(async (kind: 'video' | 'audio', newTrack: MediaStreamTrack) => {
         const promises = Array.from(peerConnections.current.entries()).map(async ([socketId, pc]) => {
+            // Find sender by track kind, or by transceiver receiver kind
             let sender = pc.getSenders().find((s) => s.track?.kind === kind);
             if (!sender) {
                 const transceiver = pc.getTransceivers().find(t => t.receiver.track.kind === kind);
                 if (transceiver) sender = transceiver.sender;
             }
+
             if (sender) {
-                console.log(`[WebRTC] Replacing ${kind} track for peer ${socketId}`);
-                await sender.replaceTrack(newTrack).catch(e => console.error(`Replace ${kind} track failed:`, e));
-            } else {
-                pc.addTrack(newTrack, localStreamRef.current!);
+                try {
+                    debugLog(`[WebRTC] replaceTrack(${kind}) for peer ${socketId}`);
+                    await sender.replaceTrack(newTrack);
+                    return;
+                } catch (error) {
+                    console.error(`[WebRTC] replaceTrack(${kind}) failed for ${socketId}:`, error);
+                }
             }
-            // Trigger renegotiation explicitly just in case browser requires it for the new track
-            triggerRenegotiation(pc, socketId);
+
+            if (!localStreamRef.current) {
+                console.warn(`[WebRTC] addTrack(${kind}) skipped for ${socketId} (missing local stream)`);
+                return;
+            }
+
+            debugLog(`[WebRTC] addTrack(${kind}) fallback for ${socketId}`);
+            pc.addTrack(newTrack, localStreamRef.current);
+            await triggerRenegotiation(pc, socketId);
         });
         await Promise.all(promises);
-    };
+    }, [triggerRenegotiation]);
 
     // ── MIC CONTROL ──────────────────────────────────────────────────────────
-    const handleMicOff = (forceOff?: boolean) => {
-        const turnOff = forceOff !== undefined ? forceOff : isMicOn;
-        if (turnOff) {
-            localStreamRef.current?.getAudioTracks().forEach((t) => t.stop());
-            const silentTrack = createSilentAudioTrack();
-            replaceTrackInPeers('audio', silentTrack);
+    const handleMicOff = useCallback(() => {
+        localStreamRef.current?.getAudioTracks().forEach((t) => t.stop());
+        const silentTrack = createSilentAudioTrack();
+        void replaceTrackInPeers('audio', silentTrack);
 
-            if (localStreamRef.current) {
-                localStreamRef.current.getAudioTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
-                localStreamRef.current.addTrack(silentTrack);
-            }
-            setIsMicOn(false);
-            emitMediaState('mic', false);
+        if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
+            localStreamRef.current.addTrack(silentTrack);
         }
-    };
+        setIsMicOn(false);
+        emitMediaState('mic', false);
+    }, [emitMediaState, replaceTrackInPeers]);
+    handleMicOffRef.current = handleMicOff;
 
     const toggleMic = async () => {
         if (isMicOn) {
-            handleMicOff(true);
+            handleMicOff();
         } else {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -397,9 +551,10 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         }
     };
 
-    // ── CAMERA CONTROL ────────────────────────────────────────────────────────
+    // ── CAMERA CONTROL ───────────────────────────────────────────────────────
     const toggleCam = async () => {
         if (isCamOn) {
+            // Turn OFF: replace with a black canvas track
             localStreamRef.current?.getVideoTracks().forEach((t) => t.stop());
             const blackTrack = createBlackVideoTrack();
             await replaceTrackInPeers('video', blackTrack);
@@ -411,6 +566,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             setIsCamOn(false);
             emitMediaState('camera', false);
         } else {
+            // Turn ON: acquire real camera and replaceTrack (no renegotiation)
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 const newVideoTrack = stream.getVideoTracks()[0];
@@ -431,7 +587,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         }
     };
 
-    // ── SCREEN SHARE ──────────────────────────────────────────────────────────
+    // ── SCREEN SHARE ─────────────────────────────────────────────────────────
     const startScreenShare = async () => {
         try {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
@@ -456,7 +612,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
 
     const stopScreenShare = async () => {
         try {
-            let replacementTrack;
+            let replacementTrack: MediaStreamTrack;
             if (isCamOn) {
                 const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 replacementTrack = camStream.getVideoTracks()[0];
@@ -480,11 +636,14 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         }
     };
 
-    // ── LEAVE ROOM ────────────────────────────────────────────────────────────
+    // ── LEAVE ROOM ───────────────────────────────────────────────────────────
     const leaveRoom = () => {
         socket?.emit('leave-room');
         peerConnections.current.forEach((pc) => pc.close());
         peerConnections.current.clear();
+        pendingCandidates.current.clear();
+        makingOffer.current.clear();
+        ignoreOffer.current.clear();
         localStreamRef.current?.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
         setLocalStream(null);

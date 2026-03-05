@@ -65,11 +65,10 @@ export default function MeetingRoomPage() {
 
     // Join room after socket is ready
     useEffect(() => {
-        console.log("socket", socket)
         if (socket) {
             joinRoom();
         }
-    }, [socket]);
+    }, [socket, joinRoom]);
 
     // Chat messages from socket
     useEffect(() => {
@@ -300,7 +299,7 @@ function RemoteVideo({
         if (videoRef.current && peer.stream) {
             videoRef.current.srcObject = peer.stream;
         }
-    }, [peer.stream]);
+    }, [peer.stream, peer.stream?.getTracks().map(t => t.id).join(',')]);
 
     const hasVideo = mediaState.camera || mediaState.screen;
 
