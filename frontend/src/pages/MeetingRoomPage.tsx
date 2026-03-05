@@ -61,7 +61,7 @@ export default function MeetingRoomPage() {
         if (localVideoRef.current && localStream) {
             localVideoRef.current.srcObject = localStream;
         }
-    }, [localStream]);
+    }, [localStream, isCamOn, isScreenSharing]);
 
     // Join room after socket is ready
     useEffect(() => {
@@ -295,13 +295,13 @@ function RemoteVideo({
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    const hasVideo = mediaState.camera || mediaState.screen;
+
     useEffect(() => {
         if (videoRef.current && peer.stream) {
             videoRef.current.srcObject = peer.stream;
         }
-    }, [peer.stream, peer.stream?.getTracks().map(t => t.id).join(',')]);
-
-    const hasVideo = mediaState.camera || mediaState.screen;
+    }, [hasVideo, peer.stream, peer.stream?.getTracks().map(t => t.id).join(',')]);
 
     return (
         <div className={`video-tile ${mediaState.mic && !isPresenter ? 'speaking-glow' : ''}`}>

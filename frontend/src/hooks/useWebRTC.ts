@@ -160,25 +160,15 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const createPeerConnection = useCallback((remotePeer: RemotePeer): RTCPeerConnection => {
         const pc = new RTCPeerConnection(ICE_SERVERS);
 
-        // 1. PRE-CREATE TRANSCEIVERS so we always have audio+video senders
-        //    ready for replaceTrack. This avoids addTrack→renegotiation churn.
-        const streams = localStreamRef.current ? [localStreamRef.current] : [];
-        pc.addTransceiver('audio', { direction: 'sendrecv', streams });
-        pc.addTransceiver('video', { direction: 'sendrecv', streams });
-
-        // 2. ATTACH EXISTING LOCAL TRACKS via replaceTrack (no renegotiation)
-        localStreamRef.current?.getTracks().forEach((track) => {
-            const transceiver = pc.getTransceivers().find(t =>
-                t.sender.track === null && t.receiver.track.kind === track.kind
-            );
-            if (transceiver) {
-                void transceiver.sender.replaceTrack(track).catch((error) => {
-                    console.error(`[WebRTC] Failed to attach initial ${track.kind} track:`, error);
-                });
-            } else {
+        // 1. ATTACH EXISTING LOCAL TRACKS via addTrack
+        // We know localStreamRef.current always has 1 audio and 1 video track
+        // thanks to our placeholder track generation at join time.
+        // This implicitly creates the transceivers and ensures onnegotiationneeded fires appropriately.
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((track) => {
                 pc.addTrack(track, localStreamRef.current!);
-            }
-        });
+            });
+        }
 
         // 3. HANDLE INCOMING REMOTE TRACKS
         //    We build a single MediaStream per peer and keep adding/replacing
@@ -287,6 +277,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             );
 
             localStreamRef.current = stream;
+            console.log("stream", stream)
             setLocalStream(stream);
             socket?.emit('join-room', {
                 roomId,
@@ -315,16 +306,13 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             const newStates: Record<string, PeerMediaState> = {};
             participants.forEach(p => {
                 newStates[p.socketId] = p.mediaState || { camera: false, mic: false, screen: false };
-                // JOINER creates PeerConnection + sends offer to each existing peer
-                callPeer(p);
+                // JOINER waits for offer from each existing peer
             });
             setPeerMediaStates(prev => ({ ...prev, ...newStates }));
         });
 
         // ── user-joined: existing peer learns a new user joined ─────────────
-        // BUG-1 FIX: Do NOT call callPeer() here. The existing peer must
-        // wait for the incoming offer from the joiner. We only add the peer
-        // to our state so the UI shows them.
+        // EXISTING PEER initiates call to new peer.
         socket.on('user-joined', (newPeer: RemotePeer) => {
             debugLog(`[WebRTC] user-joined: ${newPeer.userName} (${newPeer.socketId})`);
             setPeers((prev) =>
@@ -334,7 +322,9 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 ...prev,
                 [newPeer.socketId]: { camera: false, mic: false, screen: false },
             }));
-            // ⛔ NO callPeer here — we wait for their offer
+
+            // Initiate connection; this eventually triggers onnegotiationneeded and sends an offer
+            callPeer(newPeer);
         });
 
         // ── Media state updates ─────────────────────────────────────────────
@@ -468,14 +458,34 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             socket.off('offer');
             socket.off('answer');
             socket.off('ice-candidate');
-            socket.off('ice-candidate');
             socket.off('user-left');
             socket.off('force-mute');
             socket.off('participant-media-state');
             socket.off('participant-screen-state');
-            socket.off('participant-screen-state');
         };
     }, [socket, callPeer, createPeerConnection, flushPendingCandidates, triggerRenegotiation]);
+
+    // ── RECONNECTION LOGIC ──────────────────────────────────────────────────
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleReconnect = () => {
+            debugLog('[WebRTC] Socket reconnected, ensuring room participation');
+            if (hasJoined.current) {
+                socket.emit('join-room', {
+                    roomId,
+                    userName,
+                    mediaState: { camera: isCamOn, mic: isMicOn, screen: isScreenSharing },
+                });
+            }
+        };
+
+        socket.on('connect', handleReconnect);
+
+        return () => {
+            socket.off('connect', handleReconnect);
+        };
+    }, [socket, roomId, userName, isCamOn, isMicOn, isScreenSharing]);
 
     // ── REPLACE TRACK IN ALL PEER CONNECTIONS ────────────────────────────────
     // BUG-2 FIX: replaceTrack does NOT require renegotiation. It swaps the
