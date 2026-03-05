@@ -300,6 +300,9 @@ function RemoteVideo({
     useEffect(() => {
         if (videoRef.current && peer.stream) {
             videoRef.current.srcObject = peer.stream;
+            videoRef.current.play().catch(err => {
+                console.error('[WebRTC] Remote video auto-play blocked:', err);
+            });
         }
     }, [hasVideo, peer.stream, peer.stream?.getTracks().map(t => t.id).join(',')]);
 

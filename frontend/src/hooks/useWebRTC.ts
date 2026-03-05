@@ -125,8 +125,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         pendingCandidates.current.delete(socketId);
     }, []);
 
-    // Called only when a genuine SDP change is needed (e.g. addTrack).
-    // replaceTrack does NOT need this — it swaps media without SDP changes.
+    // ── TRIGGER RENEGOTIATION ───────────────────────────────────────────────
     const triggerRenegotiation = useCallback(async (
         pc: RTCPeerConnection,
         socketId: string
@@ -155,7 +154,6 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         }
     }, [socket]);
 
-    // ── CREATE PEER CONNECTION ───────────────────────────────────────────────
     // Factory for a new RTCPeerConnection wired with event handlers.
     const createPeerConnection = useCallback((remotePeer: RemotePeer): RTCPeerConnection => {
         const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -239,12 +237,14 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         return pc;
     }, [flushPendingCandidates, socket, triggerRenegotiation]);
 
+
+
     // ── INITIATE CONNECTION TO A PEER (joiner side only) ─────────────────────
-    // Creates a PeerConnection. The addTransceiver calls inside
+    // Creates a PeerConnection. The addTrack calls inside
     // createPeerConnection will trigger onnegotiationneeded → offer is sent.
     const callPeer = useCallback(async (remotePeer: RemotePeer) => {
         createPeerConnection(remotePeer);
-        // onnegotiationneeded fires automatically from addTransceiver
+        // onnegotiationneeded fires automatically from addTrack
     }, [createPeerConnection]);
 
     // ── JOIN ROOM ────────────────────────────────────────────────────────────
@@ -297,34 +297,44 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     useEffect(() => {
         if (!socket) return;
 
-        // ── room-participants: joiner receives list of existing users ────────
+        // ── room-state: joiner receives full room state ────────
         // The JOINER calls callPeer() for each existing user → creates offer.
-        socket.on('room-participants', (participants: (RemotePeer & { mediaState: PeerMediaState })[]) => {
-            debugLog(`[WebRTC] Received room-participants: ${participants.length} peers`);
+        socket.on('room-state', ({ participants, screenSharerSocketId }: {
+            participants: (RemotePeer & { mediaState: PeerMediaState })[];
+            screenSharerSocketId?: string;
+        }) => {
+            debugLog(`[WebRTC] Received room-state: ${participants.length} peers`);
             setPeers(participants);
 
             const newStates: Record<string, PeerMediaState> = {};
             participants.forEach(p => {
-                newStates[p.socketId] = p.mediaState || { camera: false, mic: false, screen: false };
-                // JOINER waits for offer from each existing peer
+                const state = { ...(p.mediaState || { camera: false, mic: false, screen: false }) };
+                // If this is the screen sharer, make sure their state reflects it accurately
+                if (p.socketId === screenSharerSocketId) {
+                    state.screen = true;
+                    state.camera = false;
+                }
+                newStates[p.socketId] = state;
+
+                // JOINER creates PeerConnection + sends offer to each existing peer
+                callPeer(p);
             });
             setPeerMediaStates(prev => ({ ...prev, ...newStates }));
         });
 
         // ── user-joined: existing peer learns a new user joined ─────────────
-        // EXISTING PEER initiates call to new peer.
-        socket.on('user-joined', (newPeer: RemotePeer) => {
+        // JOINER initiates call, so existing peer simply waits for offer.
+        socket.on('user-joined', (newPeer: RemotePeer & { mediaState: PeerMediaState }) => {
             debugLog(`[WebRTC] user-joined: ${newPeer.userName} (${newPeer.socketId})`);
             setPeers((prev) =>
                 prev.find((p) => p.socketId === newPeer.socketId) ? prev : [...prev, newPeer]
             );
             setPeerMediaStates(prev => ({
                 ...prev,
-                [newPeer.socketId]: { camera: false, mic: false, screen: false },
+                [newPeer.socketId]: newPeer.mediaState || { camera: false, mic: false, screen: false },
             }));
 
-            // Initiate connection; this eventually triggers onnegotiationneeded and sends an offer
-            callPeer(newPeer);
+            // ⛔ NO callPeer here — we wait for their offer
         });
 
         // ── Media state updates ─────────────────────────────────────────────
@@ -403,6 +413,10 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             try {
                 const pc = peerConnections.current.get(fromSocketId);
                 if (pc) {
+                    if (pc.signalingState !== 'have-local-offer') {
+                        debugLog(`[WebRTC] Ignoring answer because signalingState is ${pc.signalingState}`);
+                        return; // Ignore answers if we didn't send an offer or it was rolled back due to polite collision
+                    }
                     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
 
                     await flushPendingCandidates(fromSocketId, pc);
@@ -453,7 +467,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         });
 
         return () => {
-            socket.off('room-participants');
+            socket.off('room-state');
             socket.off('user-joined');
             socket.off('offer');
             socket.off('answer');
