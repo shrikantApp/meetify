@@ -37,12 +37,20 @@ export const api = {
         profile: () => request<{ id: string; name: string; email: string }>('/auth/profile'),
     },
     meetings: {
-        create: (body: { title: string }) =>
-            request<{ id: string; meetingCode: string; title: string }>('/meetings', {
+        create: (body: { title: string; lobbyEnabled?: boolean }) =>
+            request<{ id: string; meetingCode: string; title: string; lobbyEnabled: boolean }>('/meetings', {
                 method: 'POST',
                 body: JSON.stringify(body),
             }),
         list: () => request<{ id: string; meetingCode: string; title: string; createdAt: string }[]>('/meetings'),
-        get: (code: string) => request<{ id: string; meetingCode: string; title: string; host: { name: string } }>(`/meetings/${code}`),
+        get: (code: string) =>
+            request<{
+                id: string;
+                meetingCode: string;
+                title: string;
+                lobbyEnabled: boolean;
+                host: { id: string; name: string };
+            }>(`/meetings/${code}`),
     },
 };
+

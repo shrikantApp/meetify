@@ -24,8 +24,28 @@ export class MeetingsService {
         const meeting = this.meetingRepo.create({
             title: dto.title,
             meetingCode: this.generateCode(),
+            lobbyEnabled: dto.lobbyEnabled ?? true,
             host,
         });
+        return this.meetingRepo.save(meeting);
+    }
+
+    async updateMeeting(
+        meetingCode: string,
+        hostId: string,
+        updates: { lobbyEnabled?: boolean },
+    ): Promise<Meeting> {
+        const meeting = await this.meetingRepo.findOne({
+            where: { meetingCode },
+            relations: ['host'],
+        });
+        if (!meeting) throw new NotFoundException(`Meeting not found: ${meetingCode}`);
+        if (meeting.host.id !== hostId) {
+            throw new NotFoundException('Only the host may update this meeting');
+        }
+        if (updates.lobbyEnabled !== undefined) {
+            meeting.lobbyEnabled = updates.lobbyEnabled;
+        }
         return this.meetingRepo.save(meeting);
     }
 
@@ -58,3 +78,4 @@ export class MeetingsService {
         await this.participantRepo.update(participantId, { leftAt: new Date() });
     }
 }
+

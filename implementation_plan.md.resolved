@@ -1,0 +1,181 @@
+# Lobby / Waiting Room + Host Controls for Meetify
+
+Implement a production-ready waiting room (lobby) system where hosts control admission. When a meeting has `lobbyEnabled=true`, participants see a "Request to join" screen instead of directly entering. The host approves/denies requests in real-time via socket events. Also adds host controls (mute-all, remove, promote), page refresh confirmation, and premium UI.
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         CLIENT (React)                               │
+│                                                                      │
+│  MeetingRoomPage                                                     │
+│  ├── checks meeting.lobbyEnabled via REST                            │
+│  ├── if lobby ON + not host → WaitingRoomView                        │
+│  │   └── useLobby hook (join-request → wait → admitted/denied)       │
+│  ├── if lobby OFF or host or admitted → MeetingRoom                  │
+│  │   ├── useWebRTC hook (only after admit)                           │
+│  │   ├── HostLobbyPanel (pending requests sidebar for host)          │
+│  │   ├── JoinRequestToast (push notification)                        │
+│  │   └── HostControlsPanel (mute-all, remove, promote, lock)        │
+│  └── beforeunload handler for refresh confirmation                   │
+│                                                                      │
+│  Socket Events: join-request, join-request-cancel, request-accepted, │
+│  request-denied, host-action, room-state, user-joined, etc.         │
+└──────────────────┬───────────────────────────────────────────────────┘
+                   │ socket.io / WebSocket
+┌──────────────────▼───────────────────────────────────────────────────┐
+│                       SERVER (NestJS)                                │
+│                                                                      │
+│  EventsGateway                                                       │
+│  ├── rooms Map<roomId, RoomState> (existing)                         │
+│  ├── pendingRequests Map<roomId, Map<socketId, JoinRequest>> (new)   │
+│  ├── roomSettings Map<roomId, RoomSettings> (new)                    │
+│  │                                                                   │
+│  ├── handleJoinRoom → if lobbyEnabled, redirect to pending           │
+│  ├── handleJoinRequest → create pending, notify host                 │
+│  ├── handleApproveRequest → admit participant, emit room-state       │
+│  ├── handleDenyRequest → notify participant                          │
+│  ├── handleCancelRequest → remove pending, notify host               │
+│  ├── handleHostAction → mute-all, remove, promote, lock             │
+│  └── TTL cleanup interval (stale requests after N minutes)           │
+│                                                                      │
+│  Meeting Entity → +lobbyEnabled column                               │
+│  MeetingsService → +update method (toggle lobby)                     │
+│  MeetingsController → +PATCH endpoint                                │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+## Socket Event Contract
+
+| Event | Direction | Payload |
+|-------|-----------|---------|
+| `join-request` | client→server | `{ roomId, userName, mediaState }` |
+| `join-request-cancel` | client→server | `{ roomId }` |
+| `join-request-received` | server→host | `{ socketId, userId, userName, mediaState, requestedAt }` |
+| `join-request-cancelled` | server→host | `{ socketId }` |
+| `approve-request` | host→server | `{ roomId, targetSocketId, role }` |
+| `deny-request` | host→server | `{ roomId, targetSocketId, reason? }` |
+| `bulk-approve` | host→server | `{ roomId, targets: [{socketId, role}] }` |
+| `request-accepted` | server→participant | `{ role, roomState }` |
+| `request-denied` | server→participant | `{ reason? }` |
+| `host-action` | host→server | `{ roomId, action, targetSocketId?, ... }` |
+| `host-action-applied` | server→room | `{ action, targetSocketId?, ... }` |
+| `raise-hand` | client→server | `{ roomId, raised }` |
+| `hand-raised` | server→room | `{ socketId, userName, raised }` |
+
+## Proposed Changes
+
+### Backend – Shared Types
+
+#### [NEW] [lobby.types.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/signaling/lobby.types.ts)
+
+TypeScript types for `JoinRequest`, `RoomSettings`, `ParticipantRole`, `HostAction`, `AuditEntry`. Imported by the gateway.
+
+---
+
+### Backend – Database
+
+#### [MODIFY] [meeting.entity.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/meetings/entities/meeting.entity.ts)
+
+Add `lobbyEnabled: boolean` column (default `true`).
+
+#### [MODIFY] [create-meeting.dto.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/meetings/dto/create-meeting.dto.ts)
+
+Add optional `lobbyEnabled?: boolean` field.
+
+#### [MODIFY] [meetings.service.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/meetings/meetings.service.ts)
+
+Add `updateMeeting(meetingId, updateDto)` method for lobby toggle.
+
+#### [MODIFY] [meetings.controller.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/meetings/meetings.controller.ts)
+
+Add `PATCH /api/meetings/:code` endpoint.
+
+---
+
+### Backend – Signaling Gateway
+
+#### [MODIFY] [events.gateway.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/signaling/events.gateway.ts)
+
+Major changes:
+1. Add `pendingRequests` Map and `roomSettings` Map alongside existing `rooms` Map
+2. Modify [handleJoinRoom](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/signaling/events.gateway.ts#241-311) to check lobby settings — if enabled and not host, emit `lobby-waiting` instead of admitting
+3. Add `@SubscribeMessage` handlers: `join-request`, `join-request-cancel`, `approve-request`, `deny-request`, `bulk-approve`, `host-action`, `raise-hand`
+4. Update [handleDisconnect](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/signaling/events.gateway.ts#236-239) to cleanup pending requests
+5. Add TTL cleanup interval in `onModuleInit`
+6. Add in-memory audit log per room
+
+---
+
+### Backend – Tests
+
+#### [MODIFY] [events.gateway.spec.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/backend/src/signaling/events.gateway.spec.ts)
+
+Add 7 test cases: lobby-join redirect, join-request notification, approve flow, deny flow, cancel flow, disconnect cleanup, mute-all action.
+
+---
+
+### Frontend – Hooks
+
+#### [NEW] [useLobby.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/hooks/useLobby.ts)
+
+Hook managing lobby lifecycle with states: `idle → requesting → waiting → admitted/denied`. Exposes `sendJoinRequest`, `cancelRequest`, `approveRequest`, `denyRequest`, `bulkApprove`, `hostAction`. Also manages `pendingRequests` array for host-side rendering.
+
+#### [MODIFY] [useWebRTC.ts](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/hooks/useWebRTC.ts)
+
+Add `admitted` flag — only emit `join-room` and set up peer connections when `admitted=true`. Accept initial room-state from lobby flow.
+
+---
+
+### Frontend – Components
+
+#### [NEW] [WaitingRoomView.tsx](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/components/WaitingRoomView.tsx)
+
+Participant waiting room: self-preview, "Request to join" button, waiting state with cancel, denied state with retry. Premium glassmorphism UI.
+
+#### [NEW] [HostLobbyPanel.tsx](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/components/HostLobbyPanel.tsx)
+
+Host sidebar: pending requests list with approve/deny, role selection, bulk approve, search/filter, request count badge.
+
+#### [NEW] [JoinRequestToast.tsx](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/components/JoinRequestToast.tsx)
+
+Slide-in toast notification for host with approve/deny quick actions.
+
+#### [NEW] [HostControlsPanel.tsx](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/components/HostControlsPanel.tsx)
+
+Host controls: mute-all, remove, lock/unlock, end meeting, promote to co-host.
+
+#### [MODIFY] [MeetingRoomPage.tsx](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/pages/MeetingRoomPage.tsx)
+
+Restructure: fetch meeting details on mount, orchestrate lobby→admitted→room flow, add HostLobbyPanel/JoinRequestToast/HostControlsPanel, add `beforeunload` for refresh confirmation.
+
+#### [MODIFY] [DashboardPage.tsx](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/pages/DashboardPage.tsx)
+
+Add lobby toggle checkbox in create meeting form.
+
+#### [MODIFY] [index.css](file:///d:/Documents/Practice/AntiGravity/Meetify/frontend/src/index.css)
+
+Add CSS for waiting room, lobby panel, toasts, controls, animations, glassmorphism.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+Run existing + new backend tests:
+```bash
+cd d:\Documents\Practice\AntiGravity\Meetify\backend
+npx jest --verbose
+```
+
+### Manual Browser Testing (8 steps)
+
+1. **Create lobby-enabled meeting**: Dashboard → create meeting with "Enable waiting room" checked → verify meeting code generated
+2. **Participant requests to join**: Incognito browser, login as different user → navigate to meeting URL → verify "Request to join" screen (not video room) → click request → verify "Waiting for host approval"
+3. **Host receives notification**: Host browser → verify toast + lobby panel shows pending request with name/media badges
+4. **Host approves**: Click Approve → verify participant transitions from waiting room to video room with working media
+5. **Deny flow**: Third user requests → Host denies → verify friendly rejection message shown
+6. **Cancel flow**: User requests then clicks Cancel → verify host panel updates (request removed)
+7. **Refresh confirmation**: Admitted participant presses F5 → verify "Leave meeting?" confirmation dialog → if continued, rejoin works
+8. **Screen share during rejoin**: Host shares screen → participant refreshes → verify screen share visible after rejoin

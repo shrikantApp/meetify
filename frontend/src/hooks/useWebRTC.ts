@@ -299,7 +299,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
 
         // ── room-state: joiner receives full room state ────────
         // The JOINER calls callPeer() for each existing user → creates offer.
-        socket.on('room-state', ({ participants, screenSharerSocketId }: {
+        const handleRoomState = ({ participants, screenSharerSocketId }: {
             participants: (RemotePeer & { mediaState: PeerMediaState })[];
             screenSharerSocketId?: string;
         }) => {
@@ -320,11 +320,12 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 callPeer(p);
             });
             setPeerMediaStates(prev => ({ ...prev, ...newStates }));
-        });
+        };
+        socket.on('room-state', handleRoomState);
 
         // ── user-joined: existing peer learns a new user joined ─────────────
         // JOINER initiates call, so existing peer simply waits for offer.
-        socket.on('user-joined', (newPeer: RemotePeer & { mediaState: PeerMediaState }) => {
+        const handleUserJoined = (newPeer: RemotePeer & { mediaState: PeerMediaState }) => {
             debugLog(`[WebRTC] user-joined: ${newPeer.userName} (${newPeer.socketId})`);
             setPeers((prev) =>
                 prev.find((p) => p.socketId === newPeer.socketId) ? prev : [...prev, newPeer]
@@ -335,10 +336,11 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             }));
 
             // ⛔ NO callPeer here — we wait for their offer
-        });
+        };
+        socket.on('user-joined', handleUserJoined);
 
         // ── Media state updates ─────────────────────────────────────────────
-        socket.on('participant-media-state', ({ socketId, type, enabled }: {
+        const handleMediaState = ({ socketId, type, enabled }: {
             socketId: string; type: 'camera' | 'mic' | 'screen'; enabled: boolean;
         }) => {
             setPeerMediaStates(prev => ({
@@ -348,9 +350,10 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                     [type]: enabled,
                 },
             }));
-        });
+        };
+        socket.on('participant-media-state', handleMediaState);
 
-        socket.on('participant-screen-state', ({ socketId, screen, camera }: {
+        const handleScreenState = ({ socketId, screen, camera }: {
             socketId: string; screen: boolean; camera: boolean;
         }) => {
             setPeerMediaStates(prev => ({
@@ -361,10 +364,11 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                     camera,
                 },
             }));
-        });
+        };
+        socket.on('participant-screen-state', handleScreenState);
 
         // ── offer: received from a peer who wants to connect ────────────────
-        socket.on('offer', async ({ sdp, fromSocketId }: {
+        const handleOffer = async ({ sdp, fromSocketId }: {
             sdp: RTCSessionDescriptionInit; fromSocketId: string;
         }) => {
             try {
@@ -403,10 +407,11 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             } catch (e) {
                 console.error('[WebRTC] Error handling offer:', e);
             }
-        });
+        };
+        socket.on('offer', handleOffer);
 
         // ── answer ──────────────────────────────────────────────────────────
-        socket.on('answer', async ({ sdp, fromSocketId }: {
+        const handleAnswer = async ({ sdp, fromSocketId }: {
             sdp: RTCSessionDescriptionInit; fromSocketId: string;
         }) => {
             debugLog(`[WebRTC] Answer received from ${fromSocketId}`);
@@ -424,10 +429,11 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             } catch (e) {
                 console.error('[WebRTC] Error handling answer:', e);
             }
-        });
+        };
+        socket.on('answer', handleAnswer);
 
         // ── ICE candidate ───────────────────────────────────────────────────
-        socket.on('ice-candidate', async ({ candidate, fromSocketId }: {
+        const handleIceCandidate = async ({ candidate, fromSocketId }: {
             candidate: RTCIceCandidateInit; fromSocketId: string;
         }) => {
             const pc = peerConnections.current.get(fromSocketId);
@@ -441,11 +447,11 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 queue.push(candidate);
                 pendingCandidates.current.set(fromSocketId, queue);
             }
-        });
-
+        };
+        socket.on('ice-candidate', handleIceCandidate);
 
         // ── user-left ───────────────────────────────────────────────────────
-        socket.on('user-left', ({ socketId }: { socketId: string }) => {
+        const handleUserLeft = ({ socketId }: { socketId: string }) => {
             debugLog(`[WebRTC] user-left: ${socketId}`);
             peerConnections.current.get(socketId)?.close();
             peerConnections.current.delete(socketId);
@@ -459,23 +465,25 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 delete updated[socketId];
                 return updated;
             });
-        });
+        };
+        socket.on('user-left', handleUserLeft);
 
         // ── force-mute (host control) ───────────────────────────────────────
-        socket.on('force-mute', ({ muted }: { muted: boolean }) => {
+        const handleForceMute = ({ muted }: { muted: boolean }) => {
             if (muted) handleMicOffRef.current();
-        });
+        };
+        socket.on('force-mute', handleForceMute);
 
         return () => {
-            socket.off('room-state');
-            socket.off('user-joined');
-            socket.off('offer');
-            socket.off('answer');
-            socket.off('ice-candidate');
-            socket.off('user-left');
-            socket.off('force-mute');
-            socket.off('participant-media-state');
-            socket.off('participant-screen-state');
+            socket.off('room-state', handleRoomState);
+            socket.off('user-joined', handleUserJoined);
+            socket.off('participant-media-state', handleMediaState);
+            socket.off('participant-screen-state', handleScreenState);
+            socket.off('offer', handleOffer);
+            socket.off('answer', handleAnswer);
+            socket.off('ice-candidate', handleIceCandidate);
+            socket.off('user-left', handleUserLeft);
+            socket.off('force-mute', handleForceMute);
         };
     }, [socket, callPeer, createPeerConnection, flushPendingCandidates, triggerRenegotiation]);
 

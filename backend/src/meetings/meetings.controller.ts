@@ -2,6 +2,7 @@ import {
     Controller,
     Post,
     Get,
+    Patch,
     Param,
     Body,
     UseGuards,
@@ -34,4 +35,15 @@ export class MeetingsController {
     findOne(@Param('code') code: string) {
         return this.meetingsService.findByCode(code);
     }
+
+    /** PATCH /api/meetings/:code – Update meeting settings (lobby toggle) */
+    @Patch(':code')
+    update(
+        @Param('code') code: string,
+        @Body() body: { lobbyEnabled?: boolean },
+        @Request() req: ExpressRequest & { user: any },
+    ) {
+        return this.meetingsService.updateMeeting(code, req.user.id, body);
+    }
 }
+

@@ -25,6 +25,9 @@ export class Meeting {
     @JoinColumn({ name: 'host_id' })
     host: User;
 
+    @Column({ name: 'lobby_enabled', default: true })
+    lobbyEnabled: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

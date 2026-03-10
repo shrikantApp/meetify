@@ -20,6 +20,7 @@ export default function DashboardPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [title, setTitle] = useState('');
+    const [lobbyEnabled, setLobbyEnabled] = useState(true);
     const [joinCode, setJoinCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -34,7 +35,7 @@ export default function DashboardPage() {
         setLoading(true);
         setError('');
         try {
-            const meeting = await api.meetings.create({ title });
+            const meeting = await api.meetings.create({ title, lobbyEnabled });
             setMeetings((prev) => [{ ...meeting, createdAt: new Date().toISOString() }, ...prev]);
             setShowCreateModal(false);
             setTitle('');
@@ -140,6 +141,15 @@ export default function DashboardPage() {
                                 <label>Meeting Title</label>
                                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Weekly Standup" required />
                             </div>
+                            <label className="lobby-toggle-label">
+                                <input
+                                    type="checkbox"
+                                    checked={lobbyEnabled}
+                                    onChange={(e) => setLobbyEnabled(e.target.checked)}
+                                />
+                                <span>Enable waiting room (lobby)</span>
+                                <span className="lobby-toggle-hint">Participants must be approved by the host before joining</span>
+                            </label>
                             <div className="flex gap-2" style={{ marginTop: '0.5rem' }}>
                                 <button type="button" className="btn btn-ghost" onClick={() => setShowCreateModal(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary w-full" disabled={loading}>
