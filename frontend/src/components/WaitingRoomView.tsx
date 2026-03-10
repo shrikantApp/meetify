@@ -82,117 +82,126 @@ export default function WaitingRoomView({
         onRequestJoin({ camera: camOn, mic: micOn, screen: false });
     };
 
-    // ── DENIED STATE ─────────────────────────────────────────────────────
 
-    if (lobbyStatus === 'denied') {
-        return (
-            <div className="waiting-room-container" role="main" aria-label="Join request denied">
-                <div className="waiting-room-card waiting-room-denied">
-                    <div className="denied-icon-wrapper">
-                        <XCircle size={56} />
-                    </div>
-                    <h2>Request Declined</h2>
-                    <p className="denied-reason">{deniedReason}</p>
-                    <button
-                        className="btn-lobby btn-lobby-primary"
-                        onClick={onRetry}
-                        aria-label="Try requesting again"
-                    >
-                        Try Again
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     // ── IDLE / REQUESTING / WAITING STATE ─────────────────────────────────
 
     return (
-        <div className="waiting-room-container" role="main" aria-label="Meeting waiting room">
-            <div className="waiting-room-card">
-                <h1 className="waiting-room-title">{meetingTitle || 'Meeting'}</h1>
-                <p className="waiting-room-subtitle">You are about to join this meeting</p>
-
-                {/* Self-preview */}
-                <div className="self-preview-wrapper">
-                    <div className="self-preview" aria-label="Camera preview">
+        <div className="min-h-screen bg-bg-primary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent/10 via-bg-primary to-bg-primary">
+            <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8 items-center animate-in fade-in slide-in-from-bottom-8 duration-700">
+                {/* Left side: Preview */}
+                <div className="flex flex-col gap-6">
+                    <div className="relative aspect-video rounded-3xl overflow-hidden bg-bg-card border border-white/10 shadow-2xl group">
                         {camOn ? (
                             <video
                                 ref={videoRef}
                                 autoPlay
                                 playsInline
                                 muted
-                                className="self-preview-video"
+                                className="w-full h-full object-cover mirror"
                             />
                         ) : (
-                            <div className="self-preview-off">
-                                <UserCheck size={48} />
-                                <span>Camera is off</span>
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-bg-secondary to-bg-card">
+                                <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center text-accent">
+                                    <UserCheck size={40} />
+                                </div>
+                                <span className="text-text-secondary font-medium">Camera is off</span>
                             </div>
                         )}
-                    </div>
 
-                    <div className="self-preview-controls">
-                        <button
-                            className={`btn-media ${micOn ? 'btn-media-on' : 'btn-media-off'}`}
-                            onClick={() => setMicOn(!micOn)}
-                            aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'}
-                            disabled={lobbyStatus === 'waiting'}
-                        >
-                            {micOn ? <Mic size={20} /> : <MicOff size={20} />}
-                        </button>
-                        <button
-                            className={`btn-media ${camOn ? 'btn-media-on' : 'btn-media-off'}`}
-                            onClick={() => setCamOn(!camOn)}
-                            aria-label={camOn ? 'Turn off camera' : 'Turn on camera'}
-                            disabled={lobbyStatus === 'waiting'}
-                        >
-                            {camOn ? <Video size={20} /> : <VideoOff size={20} />}
-                        </button>
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 p-2 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                            <button
+                                onClick={() => setMicOn(!micOn)}
+                                className={`p-3 rounded-xl transition-all ${micOn ? 'bg-white/10 text-white' : 'bg-accent-danger text-white'}`}
+                                disabled={lobbyStatus === 'waiting'}
+                            >
+                                {micOn ? <Mic size={20} /> : <MicOff size={20} />}
+                            </button>
+                            <button
+                                onClick={() => setCamOn(!camOn)}
+                                className={`p-3 rounded-xl transition-all ${camOn ? 'bg-white/10 text-white' : 'bg-accent-danger text-white'}`}
+                                disabled={lobbyStatus === 'waiting'}
+                            >
+                                {camOn ? <Video size={20} /> : <VideoOff size={20} />}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="px-4 flex items-center gap-3 text-text-secondary">
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
+                        <p className="text-sm font-medium">Your camera and mic are working</p>
                     </div>
                 </div>
 
-                {/* Action area */}
-                <div className="waiting-room-actions">
-                    {lobbyStatus === 'idle' && (
-                        <button
-                            className="btn-lobby btn-lobby-primary btn-request-join"
-                            onClick={handleRequest}
-                            aria-label="Request to join meeting"
-                        >
-                            <UserCheck size={18} />
-                            Request to Join
-                        </button>
-                    )}
+                {/* Right side: Actions */}
+                <div className="bg-bg-card/50 backdrop-blur-2xl p-10 rounded-[2.5rem] border border-white/5 shadow-2xl">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-white mb-2 leading-tight">
+                            {meetingTitle || 'Meeting Room'}
+                        </h1>
+                        <p className="text-text-secondary">Ready to join the conversation?</p>
+                    </div>
 
-                    {lobbyStatus === 'requesting' && (
-                        <button className="btn-lobby btn-lobby-loading" disabled>
-                            <Loader2 size={18} className="spinner" />
-                            Sending request…
-                        </button>
-                    )}
-
-                    {lobbyStatus === 'waiting' && (
-                        <div className="waiting-state" aria-live="polite">
-                            <div className="waiting-indicator">
-                                <Clock size={20} className="pulse" />
-                                <div className="waiting-text">
-                                    <span className="waiting-label">Waiting for host approval</span>
-                                    <span className="waiting-timer">{formatTime(elapsed)}</span>
-                                </div>
-                            </div>
-                            <p className="waiting-copy">
-                                The host will let you in soon. Please wait.
-                            </p>
+                    <div className="space-y-6">
+                        {lobbyStatus === 'idle' && (
                             <button
-                                className="btn-lobby btn-lobby-ghost"
-                                onClick={onCancel}
-                                aria-label="Cancel join request"
+                                onClick={handleRequest}
+                                className="w-full py-4 bg-accent hover:bg-accent-hover text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl shadow-accent/30 transition-all active:scale-[0.98]"
                             >
-                                Cancel Request
+                                <UserCheck size={20} />
+                                Request to Join
                             </button>
-                        </div>
-                    )}
+                        )}
+
+                        {lobbyStatus === 'requesting' && (
+                            <button className="w-full py-4 bg-white/5 text-white/50 rounded-2xl font-bold flex items-center justify-center gap-3 cursor-wait">
+                                <Loader2 size={20} className="animate-spin" />
+                                Sending request...
+                            </button>
+                        )}
+
+                        {lobbyStatus === 'waiting' && (
+                            <div className="space-y-6 animate-in fade-in zoom-in duration-500">
+                                <div className="flex items-center gap-4 p-4 bg-accent/10 border border-accent/20 rounded-2xl">
+                                    <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-white shadow-lg shadow-accent/40">
+                                        <Clock size={24} className="animate-pulse" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-accent">Waiting for host...</span>
+                                        <span className="text-xs text-text-secondary font-mono">Elapsed: {formatTime(elapsed)}</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-text-secondary leading-relaxed">
+                                    The meeting host has been notified. They'll let you in any moment now.
+                                </p>
+                                <button
+                                    onClick={onCancel}
+                                    className="w-full py-3 text-sm font-bold text-white/40 hover:text-white transition-all underline underline-offset-8"
+                                >
+                                    Cancel Request
+                                </button>
+                            </div>
+                        )}
+
+                        {lobbyStatus === 'denied' && (
+                            <div className="space-y-6 animate-in fade-in zoom-in duration-500">
+                                <div className="flex items-center gap-4 p-4 bg-accent-danger/10 border border-accent-danger/20 rounded-2xl">
+                                    <div className="w-12 h-12 rounded-xl bg-accent-danger flex items-center justify-center text-white shadow-lg shadow-accent-danger/40">
+                                        <XCircle size={24} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-accent-danger">Entry Declined</span>
+                                        <p className="text-xs text-text-secondary mt-1">{deniedReason || 'The host declined your request.'}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={onRetry}
+                                    className="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-bold transition-all"
+                                >
+                                    Try Again
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

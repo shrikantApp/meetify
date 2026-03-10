@@ -406,6 +406,23 @@ export class EventsGateway
         }
 
         // Clean up any previous room membership (reconnect/join retry)
+        // AND check if the same userId is already in a room with a different socketId
+        for (const [rid, room] of this.rooms.entries()) {
+            for (const [sid, info] of Object.entries(room.participants)) {
+                if (info.userId === client.user.sub) {
+                    this.logDebug('removing stale session for user', { userId: info.userId, oldSocketId: sid, newSocketId: client.id });
+                    const oldSocket = this.server.of('/signaling').sockets.get(sid);
+                    if (oldSocket) {
+                        this.removeParticipant(oldSocket, 'leave-room');
+                        oldSocket.disconnect();
+                    } else {
+                        // If socket is already gone from server.sockets, manually clean up
+                        delete room.participants[sid];
+                        this.server.to(rid).emit('user-left', { socketId: sid, userId: info.userId, userName: info.userName });
+                    }
+                }
+            }
+        }
         this.removeParticipant(client, 'leave-room');
 
         const settings = this.roomSettings.get(data.roomId);

@@ -92,6 +92,13 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const [isCamOn, setIsCamOn] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
 
+    // Device management
+    const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+    const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+    const [selectedAudioId, setSelectedAudioId] = useState<string>('');
+    const [selectedVideoId, setSelectedVideoId] = useState<string>('');
+    const [isMirrored, setIsMirrored] = useState(true);
+
     // Core WebRTC refs
     const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
     const localStreamRef = useRef<MediaStream | null>(null);
@@ -102,6 +109,9 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const makingOffer = useRef<Map<string, boolean>>(new Map());
     const ignoreOffer = useRef<Map<string, boolean>>(new Map());
     const handleMicOffRef = useRef<() => void>(() => undefined);
+
+    const isRealAudio = useRef(false);
+    const isRealVideo = useRef(false);
 
     // ── MEDIA STATE BROADCAST ────────────────────────────────────────────────
     const emitMediaState = useCallback((type: 'camera' | 'mic' | 'screen', enabled: boolean) => {
@@ -253,32 +263,43 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         hasJoined.current = true;
 
         try {
+            debugLog('[WebRTC] Joining room and acquiring media...');
             const stream = new MediaStream();
             let userStream: MediaStream | null = null;
 
-            if (isCamOn || isMicOn) {
+            // Attempt to get real media ONLY if explicitly on
+            if (isMicOn || isCamOn) {
                 try {
-                    userStream = await navigator.mediaDevices.getUserMedia({ video: isCamOn, audio: isMicOn });
+                    userStream = await navigator.mediaDevices.getUserMedia({
+                        audio: isMicOn,
+                        video: isCamOn
+                    });
+                    if (isMicOn) isRealAudio.current = true;
+                    if (isCamOn) isRealVideo.current = true;
+                    debugLog('[WebRTC] Successfully acquired requested real media tracks');
                 } catch (err) {
-                    console.warn('Could not get initial user media', err);
+                    console.warn('[WebRTC] Pre-join media acquisition failed. Using placeholders.', err);
                 }
             }
 
-            // Always have exactly 1 audio + 1 video track (placeholder if needed)
-            stream.addTrack(
-                userStream && userStream.getAudioTracks().length > 0
-                    ? userStream.getAudioTracks()[0]
-                    : createSilentAudioTrack()
-            );
-            stream.addTrack(
-                userStream && userStream.getVideoTracks().length > 0
-                    ? userStream.getVideoTracks()[0]
-                    : createBlackVideoTrack()
-            );
+            // Assemble the final local stream
+            const aTrack = (userStream && userStream.getAudioTracks().length > 0)
+                ? userStream.getAudioTracks()[0]
+                : createSilentAudioTrack();
+            const vTrack = (userStream && userStream.getVideoTracks().length > 0)
+                ? userStream.getVideoTracks()[0]
+                : createBlackVideoTrack();
+
+            // Set enabled state (though placeholders are always enabled, they are silent/black)
+            aTrack.enabled = true;
+            vTrack.enabled = true;
+
+            stream.addTrack(aTrack);
+            stream.addTrack(vTrack);
 
             localStreamRef.current = stream;
-            console.log("stream", stream)
-            setLocalStream(stream);
+            setLocalStream(new MediaStream(stream.getTracks()));
+
             socket?.emit('join-room', {
                 roomId,
                 userName,
@@ -287,9 +308,9 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
 
         } catch (err) {
             hasJoined.current = false;
-            console.error('Failed to setup local stream:', err);
+            console.error('[WebRTC] Failed to setup local stream:', err);
         }
-    }, [socket, roomId, userName, isCamOn, isMicOn, emitMediaState]);
+    }, [socket, roomId, userName, isCamOn, isMicOn]);
 
     // ══════════════════════════════════════════════════════════════════════════
     //  SIGNALING EVENT LISTENERS
@@ -559,62 +580,148 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     }, [emitMediaState, replaceTrackInPeers]);
     handleMicOffRef.current = handleMicOff;
 
-    const toggleMic = async () => {
-        if (isMicOn) {
-            handleMicOff();
-        } else {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const newAudioTrack = stream.getAudioTracks()[0];
-                await replaceTrackInPeers('audio', newAudioTrack);
+    // ── MEDIA TRACK HELPERS ──────────────────────────────────────────────────
+    const updateLocalStreamTracks = useCallback((kind: 'audio' | 'video', newTrack: MediaStreamTrack) => {
+        if (!localStreamRef.current) return;
 
-                if (localStreamRef.current) {
-                    localStreamRef.current.getAudioTracks().forEach((t) => {
-                        t.stop();
-                        localStreamRef.current!.removeTrack(t);
-                    });
-                    localStreamRef.current.addTrack(newAudioTrack);
-                }
-                setIsMicOn(true);
-                emitMediaState('mic', true);
+        const oldTracks = kind === 'audio'
+            ? localStreamRef.current.getAudioTracks()
+            : localStreamRef.current.getVideoTracks();
+
+        oldTracks.forEach((t) => {
+            t.stop();
+            localStreamRef.current!.removeTrack(t);
+        });
+
+        localStreamRef.current.addTrack(newTrack);
+
+        // Return a fresh reference so React <video> srcObject detectors fire
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+    }, []);
+
+    const toggleMic = async (deviceId?: string | any) => {
+        // Defensive check: if called directly from onClick, deviceId will be an event object
+        const realDeviceId = typeof deviceId === 'string' ? deviceId : undefined;
+        const targetId = realDeviceId || selectedAudioId;
+
+        // CASE 1: Device Switch
+        if (realDeviceId) {
+            try {
+                const constraints = { audio: { deviceId: { exact: realDeviceId } } };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const track = stream.getAudioTracks()[0];
+                await replaceTrackInPeers('audio', track);
+                updateLocalStreamTracks('audio', track);
+                track.enabled = isMicOn;
+                isRealAudio.current = true;
+                setSelectedAudioId(deviceId);
             } catch (err) {
-                console.error('Could not restart microphone:', err);
+                console.error('[WebRTC] Mic switch failed', err);
+            }
+            return;
+        }
+
+        // CASE 2: Toggle
+        if (localStreamRef.current) {
+            const newState = !isMicOn;
+
+            // If turning OFF: STOP track and replace with placeholder
+            if (!newState) {
+                const currentTrack = localStreamRef.current.getAudioTracks()[0];
+                if (currentTrack) {
+                    currentTrack.stop(); // Truly stop hardware
+                    console.log('[WebRTC] Microphone hardware STOPPED');
+                }
+                const silentTrack = createSilentAudioTrack();
+                await replaceTrackInPeers('audio', silentTrack);
+                updateLocalStreamTracks('audio', silentTrack);
+                isRealAudio.current = false;
+                setIsMicOn(false);
+                emitMediaState('mic', false);
+                return;
+            }
+
+            // If turning ON: Acquire real track
+            if (newState && !isRealAudio.current) {
+                try {
+                    console.log('[WebRTC] Acquiring real microphone track...');
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: targetId ? { deviceId: { exact: targetId } } : true });
+                    const realTrack = stream.getAudioTracks()[0];
+                    await replaceTrackInPeers('audio', realTrack);
+                    updateLocalStreamTracks('audio', realTrack);
+                    isRealAudio.current = true;
+                    console.log('[WebRTC] Microphone hardware STARTED');
+                    setIsMicOn(true);
+                    emitMediaState('mic', true);
+                } catch (err) {
+                    console.error('[WebRTC] Mic acquisition failed', err);
+                }
+                return;
             }
         }
     };
 
     // ── CAMERA CONTROL ───────────────────────────────────────────────────────
-    const toggleCam = async () => {
-        if (isCamOn) {
-            // Turn OFF: replace with a black canvas track
-            localStreamRef.current?.getVideoTracks().forEach((t) => t.stop());
-            const blackTrack = createBlackVideoTrack();
-            await replaceTrackInPeers('video', blackTrack);
+    const toggleCam = async (deviceId?: string | any) => {
+        // Defensive check: if called directly from onClick, deviceId will be an event object
+        const realDeviceId = typeof deviceId === 'string' ? deviceId : undefined;
+        const targetId = realDeviceId || selectedVideoId;
 
-            if (localStreamRef.current) {
-                localStreamRef.current.getVideoTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
-                localStreamRef.current.addTrack(blackTrack);
-            }
-            setIsCamOn(false);
-            emitMediaState('camera', false);
-        } else {
-            // Turn ON: acquire real camera and replaceTrack (no renegotiation)
+        // CASE 1: Device Switch
+        if (realDeviceId) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const newVideoTrack = stream.getVideoTracks()[0];
-                await replaceTrackInPeers('video', newVideoTrack);
-
-                if (localStreamRef.current) {
-                    localStreamRef.current.getVideoTracks().forEach((t) => {
-                        t.stop();
-                        localStreamRef.current!.removeTrack(t);
-                    });
-                    localStreamRef.current.addTrack(newVideoTrack);
-                }
-                setIsCamOn(true);
-                emitMediaState('camera', true);
+                const constraints = { video: { deviceId: { exact: realDeviceId } } };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const track = stream.getVideoTracks()[0];
+                console.log(`[WebRTC] Camera switched to device: ${realDeviceId}`);
+                await replaceTrackInPeers('video', track);
+                updateLocalStreamTracks('video', track);
+                track.enabled = isCamOn;
+                console.log(`[WebRTC] New camera track enabled = ${isCamOn}`);
+                isRealVideo.current = true;
+                setSelectedVideoId(deviceId);
             } catch (err) {
-                console.error('Could not restart camera:', err);
+                console.error('[WebRTC] Cam switch failed', err);
+            }
+            return;
+        }
+
+        // CASE 2: Toggle
+        if (localStreamRef.current) {
+            const newState = !isCamOn;
+
+            // If turning OFF: STOP track and replace with placeholder
+            if (!newState) {
+                const currentTrack = localStreamRef.current.getVideoTracks()[0];
+                if (currentTrack) {
+                    currentTrack.stop(); // Truly stop hardware
+                    console.log('[WebRTC] Camera hardware STOPPED');
+                }
+                const blackTrack = createBlackVideoTrack();
+                await replaceTrackInPeers('video', blackTrack);
+                updateLocalStreamTracks('video', blackTrack);
+                isRealVideo.current = false;
+                setIsCamOn(false);
+                emitMediaState('camera', false);
+                return;
+            }
+
+            // If turning ON: Acquire real track
+            if (newState && !isRealVideo.current) {
+                try {
+                    console.log('[WebRTC] Acquiring real camera track...');
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: targetId ? { deviceId: { exact: targetId } } : true });
+                    const realTrack = stream.getVideoTracks()[0];
+                    await replaceTrackInPeers('video', realTrack);
+                    updateLocalStreamTracks('video', realTrack);
+                    isRealVideo.current = true;
+                    console.log('[WebRTC] Camera hardware STARTED');
+                    setIsCamOn(true);
+                    emitMediaState('camera', true);
+                } catch (err) {
+                    console.error('[WebRTC] Cam acquisition failed', err);
+                }
+                return;
             }
         }
     };
@@ -669,7 +776,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     };
 
     // ── LEAVE ROOM ───────────────────────────────────────────────────────────
-    const leaveRoom = () => {
+    const leaveRoom = useCallback(() => {
         socket?.emit('leave-room');
         peerConnections.current.forEach((pc) => pc.close());
         peerConnections.current.clear();
@@ -682,7 +789,33 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         setPeers([]);
         setPeerMediaStates({});
         hasJoined.current = false;
-    };
+    }, [socket]);
+
+    // ── CLEANUP ON UNLOAD ────────────────────────────────────────────────────
+    useEffect(() => {
+        const handleUnload = () => {
+            leaveRoom();
+        };
+        window.addEventListener('beforeunload', handleUnload);
+        return () => window.removeEventListener('beforeunload', handleUnload);
+    }, [leaveRoom]);
+
+    // ── DEVICE ENUMERATION ───────────────────────────────────────────────────
+    const refreshDevices = useCallback(async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            setAudioDevices(devices.filter(d => d.kind === 'audioinput'));
+            setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
+        } catch (err) {
+            console.error('Error enumerating devices:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        refreshDevices();
+        navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
+        return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
+    }, [refreshDevices]);
 
     return {
         localStream,
@@ -691,11 +824,18 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         isMicOn,
         isCamOn,
         isScreenSharing,
+        audioDevices,
+        videoDevices,
+        selectedAudioId,
+        selectedVideoId,
+        isMirrored,
+        setIsMirrored,
         joinRoom,
         leaveRoom,
         toggleMic,
         toggleCam,
         startScreenShare,
         stopScreenShare,
+        refreshDevices,
     };
 }

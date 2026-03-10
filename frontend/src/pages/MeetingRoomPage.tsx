@@ -10,9 +10,12 @@ import HostLobbyPanel from '../components/HostLobbyPanel';
 import JoinRequestToast from '../components/JoinRequestToast';
 import HostControlsPanel from '../components/HostControlsPanel';
 import {
-    Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, Copy, Check,
-    Users, MessageSquare, DoorOpen, Hand,
+    Video, VideoOff, MicOff, Check, Info,
+    Users, MessageSquare, X
 } from 'lucide-react';
+import MeetingControls from '../components/MeetingControls';
+import VideoTile from '../components/VideoTile';
+import DeviceSettingsModal from '../components/DeviceSettingsModal';
 
 interface ChatMessage {
     message: string;
@@ -126,6 +129,11 @@ export default function MeetingRoomPage() {
         !meeting?.lobbyEnabled ||
         lobbyStatus === 'admitted';
 
+    const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
+    const [sidebarTab, setSidebarTab] = useState<'participants' | 'chat' | 'lobby'>('participants');
+    const [showSettings, setShowSettings] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
     const {
         localStream,
         peers,
@@ -133,6 +141,12 @@ export default function MeetingRoomPage() {
         isMicOn,
         isCamOn,
         isScreenSharing,
+        audioDevices,
+        videoDevices,
+        selectedAudioId,
+        selectedVideoId,
+        isMirrored,
+        setIsMirrored,
         joinRoom,
         leaveRoom,
         toggleMic,
@@ -140,6 +154,12 @@ export default function MeetingRoomPage() {
         startScreenShare,
         stopScreenShare,
     } = useWebRTC({ socket, roomId: meetingCode!, userName: user?.name || 'Guest' });
+
+    // Clock effect
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     // Track the media state chosen in the waiting room to apply it once admitted
     const pendingMediaState = useRef<{ camera: boolean; mic: boolean } | null>(null);
@@ -160,30 +180,31 @@ export default function MeetingRoomPage() {
         }
     }, [admitted, isCamOn, isMicOn, toggleCam, toggleMic]);
 
-    const localVideoRef = useRef<HTMLVideoElement>(null);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
-    const [sidebarTab, setSidebarTab] = useState<'participants' | 'chat' | 'lobby'>('participants');
     const [copied, setCopied] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [handRaised, setHandRaised] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(true);
 
-    // Timer
-    const [elapsed, setElapsed] = useState(0);
+    // Active speaker logic: priority to screen sharer, then first peer with mic on, then local
     useEffect(() => {
-        if (!admitted) return;
-        const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
-        return () => clearInterval(timer);
-    }, [admitted]);
-    const formatTimer = (s: number) =>
-        `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-
-    // Attach local stream to video element
-    useEffect(() => {
-        if (localVideoRef.current && localStream) {
-            localVideoRef.current.srcObject = localStream;
+        const screenSharer = peers.find(p => peerMediaStates[p.socketId]?.screen);
+        if (screenSharer) {
+            setActiveSpeakerId(screenSharer.socketId);
+        } else {
+            const speaker = peers.find(p => peerMediaStates[p.socketId]?.mic);
+            if (speaker) {
+                setActiveSpeakerId(speaker.socketId);
+            } else if (isMicOn || isCamOn || isScreenSharing) {
+                setActiveSpeakerId('local');
+            } else if (peers.length > 0) {
+                setActiveSpeakerId(peers[0].socketId);
+            } else {
+                setActiveSpeakerId(null);
+            }
         }
-    }, [localStream, isCamOn, isScreenSharing]);
+    }, [peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing]);
 
     // Join room + configure (host sends lobby config)
     useEffect(() => {
@@ -282,6 +303,27 @@ export default function MeetingRoomPage() {
         socket.emit('raise-hand', { roomId: meetingCode, raised: newState });
     }, [socket, meetingCode, handRaised]);
 
+    // ── KEYBOARD SHORTCUTS ───────────────────────────────────────────────
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Check if user is typing in an input/textarea
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+                e.preventDefault();
+                void toggleMic();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+                e.preventDefault();
+                void toggleCam();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [toggleMic, toggleCam]);
+
     // ── Loading / Error States ───────────────────────────────────────────
 
     if (loadingInfo) {
@@ -326,360 +368,260 @@ export default function MeetingRoomPage() {
 
     // ── Main Meeting Room ────────────────────────────────────────────────
 
-    const peerCount = peers.length;
-    const gridClass =
-        peerCount === 0
-            ? 'peers-0'
-            : peerCount === 1
-                ? 'peers-1'
-                : peerCount === 2
-                    ? 'peers-2'
-                    : peerCount <= 4
-                        ? 'peers-4'
-                        : 'peers-many';
 
-    const hasScreenShare = isScreenSharing || peers.some((p) => peerMediaStates[p.socketId]?.screen);
 
     return (
-        <div className="meeting-room">
-            {/* ── HEADER ── */}
-            <div className="meeting-header">
-                <div className="meeting-meta">
-                    <span className="meeting-title">{meeting.title || 'Meeting Room'}</span>
-                    <span className="meeting-code">{meetingCode}</span>
-                    {isLocked && <span className="meeting-locked-badge">🔒 Locked</span>}
+        <div className="flex flex-col h-screen bg-[#0d0f18] text-text-primary overflow-hidden font-inter">
+            {/* ── TOP BAR (Google Meet 2025 Style) ── */}
+            <header className="flex items-center justify-between px-8 py-4 z-20">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white shadow-lg shadow-accent/20">
+                            <Video size={20} />
+                        </div>
+                        <div className="flex flex-col">
+                            <h1 className="text-lg font-bold tracking-tight text-white line-clamp-1 max-w-[200px] md:max-w-none">
+                                {meeting.title || 'Meeting Room'}
+                            </h1>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">
+                                    {meetingCode}
+                                </span>
+                                <div className="w-1 h-1 rounded-full bg-white/20" />
+                                <span className="text-[10px] text-text-secondary font-medium">
+                                    {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="meeting-header-actions">
+
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
+                        <Users size={16} className="text-text-secondary" />
+                        <span className="text-sm font-bold text-white/90">{peers.length + 1}</span>
+                    </div>
+                    <button
+                        onClick={copyLink}
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold transition-all group"
+                    >
+                        {copied ? <Check size={14} className="text-accent-success" /> : <Info size={14} className="group-hover:text-accent" />}
+                        <span>{copied ? 'Link Copied' : 'Details'}</span>
+                    </button>
                     {isHost && pendingRequests.length > 0 && (
                         <button
-                            className="lobby-indicator-btn"
-                            onClick={() => setSidebarTab('lobby')}
-                            aria-label="View pending requests"
+                            onClick={() => { setSidebarTab('lobby'); setShowSidebar(true); }}
+                            className="relative p-2 bg-accent/20 border border-accent/40 rounded-lg text-accent hover:bg-accent/30 transition-all ml-2"
                         >
-                            <DoorOpen size={16} />
-                            <span className="lobby-badge">{pendingRequests.length}</span>
+                            <Users size={18} />
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent-danger text-[10px] font-bold text-white shadow-lg">
+                                {pendingRequests.length}
+                            </span>
                         </button>
                     )}
-                    <button className="copy-link-btn" onClick={copyLink}>
-                        {copied ? <Check size={14} /> : <Copy size={14} />}
-                        {copied ? 'Copied!' : 'Copy Link'}
-                    </button>
                 </div>
-            </div>
+            </header>
 
-            {/* ── BODY ── */}
-            <div className="meeting-body">
-                {/* Video Grid */}
-                <div className={`video-grid ${hasScreenShare ? 'has-screen-share' : gridClass}`}>
-                    {/* Presenter (Screen Share) */}
-                    {hasScreenShare && (
-                        <div className="video-tile presenter">
-                            {isScreenSharing ? (
-                                <video ref={localVideoRef} autoPlay muted playsInline />
-                            ) : (
-                                peers.map((p) =>
-                                    peerMediaStates[p.socketId]?.screen ? (
-                                        <RemoteVideo
-                                            key={`screen-${p.socketId}`}
-                                            peer={p}
-                                            mediaState={peerMediaStates[p.socketId]}
-                                            isPresenter={true}
-                                        />
-                                    ) : null,
-                                )
-                            )}
-                            {isScreenSharing && (
-                                <>
-                                    <div className="screen-share-badge">
-                                        <Monitor size={12} /> You are sharing
-                                    </div>
-                                    <div className="participant-name">You ({user?.name})</div>
-                                </>
-                            )}
-                        </div>
-                    )}
+            {/* ── MAIN BODY ── */}
+            <main className="flex flex-1 relative overflow-hidden px-8 pb-32">
+                <div className={`flex-1 flex flex-col relative transition-all duration-500 ease-in-out ${showSidebar ? 'mr-[380px]' : ''}`}>
+                    {/* Video Grid */}
+                    <div className={`flex-1 min-h-0 grid gap-6 auto-rows-fr ${peers.length === 0 ? 'grid-cols-1' :
+                        peers.length === 1 ? 'grid-cols-1 md:grid-cols-2' :
+                            peers.length === 2 ? 'grid-cols-1 md:grid-cols-3' :
+                                'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                        }`}>
+                        {/* Local Video - Active Speaker Priority */}
+                        <VideoTile
+                            stream={localStream || undefined}
+                            userName={user?.name || 'You'}
+                            isLocal={true}
+                            isMicOn={isMicOn}
+                            isCamOn={isCamOn}
+                            isMirrored={isMirrored}
+                            isActiveSpeaker={activeSpeakerId === 'local'}
+                        />
 
-                    {/* Smaller tiles */}
-                    <div className={hasScreenShare ? 'other-peers' : 'contents'}>
-                        {/* Local Video */}
-                        {!isScreenSharing && (
-                            <div className={`video-tile ${isMicOn ? 'speaking-glow' : ''}`}>
-                                {isCamOn ? (
-                                    <video ref={localVideoRef} autoPlay muted playsInline />
-                                ) : (
-                                    <div className="avatar-fallback">
-                                        {user?.name?.[0]?.toUpperCase() || '?'}
-                                    </div>
-                                )}
-                                <div className="participant-name">
-                                    You ({user?.name})
-                                    {!isMicOn && (
-                                        <MicOff
-                                            size={14}
-                                            style={{ marginLeft: '6px', color: '#ef4444' }}
-                                        />
-                                    )}
-                                    {isHost && <span className="role-tag">Host</span>}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Remote Peers */}
-                        {peers.map((peer) => {
-                            const state = peerMediaStates[peer.socketId] || {
-                                camera: false,
-                                mic: false,
-                                screen: false,
-                            };
-                            if (state.screen) return null;
-                            return (
-                                <RemoteVideo
-                                    key={peer.socketId}
-                                    peer={peer}
-                                    mediaState={state}
-                                    isPresenter={false}
-                                />
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Sidebar */}
-                <div className="sidebar">
-                    <div className="sidebar-tabs">
-                        <button
-                            className={`sidebar-tab ${sidebarTab === 'participants' ? 'active' : ''}`}
-                            onClick={() => setSidebarTab('participants')}
-                        >
-                            <Users size={14} style={{ display: 'inline', marginRight: '0.3rem' }} />
-                            People ({peers.length + 1})
-                        </button>
-                        <button
-                            className={`sidebar-tab ${sidebarTab === 'chat' ? 'active' : ''}`}
-                            onClick={() => setSidebarTab('chat')}
-                        >
-                            <MessageSquare
-                                size={14}
-                                style={{ display: 'inline', marginRight: '0.3rem' }}
+                        {/* Remote Videos */}
+                        {peers.map((p) => (
+                            <VideoTile
+                                key={p.socketId}
+                                stream={p.stream}
+                                userName={p.userName}
+                                isMicOn={peerMediaStates[p.socketId]?.mic ?? true}
+                                isCamOn={peerMediaStates[p.socketId]?.camera ?? true}
+                                isActiveSpeaker={activeSpeakerId === p.socketId}
                             />
-                            Chat
-                        </button>
-                        {isHost && (
-                            <button
-                                className={`sidebar-tab ${sidebarTab === 'lobby' ? 'active' : ''}`}
-                                onClick={() => setSidebarTab('lobby')}
-                            >
-                                <DoorOpen
-                                    size={14}
-                                    style={{ display: 'inline', marginRight: '0.3rem' }}
-                                />
-                                Lobby
-                                {pendingRequests.length > 0 && (
-                                    <span className="lobby-badge-sm">{pendingRequests.length}</span>
-                                )}
-                            </button>
-                        )}
+                        ))}
                     </div>
+                </div>
 
-                    <div
-                        className="sidebar-content"
-                        style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
-                    >
-                        {sidebarTab === 'participants' && (
-                            <>
-                                <div className="participant-row">
-                                    <div className="avatar">{user?.name?.[0]?.toUpperCase()}</div>
-                                    <div className="pname">
-                                        {user?.name} (You)
-                                        {isHost && <span className="role-tag">Host</span>}
-                                    </div>
-                                </div>
-                                {peers.map((p) => (
-                                    <div key={p.socketId} className="participant-row">
-                                        <div className="avatar">
-                                            {p.userName?.[0]?.toUpperCase()}
+                {/* Sidebar Overlay/Panel */}
+                <div className={`absolute top-0 right-0 h-full w-[350px] bg-bg-card/40 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] z-40 transition-all duration-500 ease-in-out shadow-2xl ${showSidebar ? 'translate-x-0' : 'translate-x-[400px]'}`}>
+                    <div className="flex flex-col h-full">
+                        <div className="flex items-center justify-between p-6 border-b border-white/5">
+                            <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+                                <button
+                                    onClick={() => setSidebarTab('participants')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${sidebarTab === 'participants' ? 'bg-accent text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                                >
+                                    People
+                                </button>
+                                <button
+                                    onClick={() => setSidebarTab('chat')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${sidebarTab === 'chat' ? 'bg-accent text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                                >
+                                    Chat
+                                </button>
+                                {isHost && (
+                                    <button
+                                        onClick={() => setSidebarTab('lobby')}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${sidebarTab === 'lobby' ? 'bg-accent text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                                    >
+                                        Lobby
+                                    </button>
+                                )}
+                            </div>
+                            <button onClick={() => setShowSidebar(false)} className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                            {sidebarTab === 'participants' && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-accent/40 flex items-center justify-center font-bold">{user?.name?.[0]?.toUpperCase()}</div>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold">{user?.name} (You)</span>
+                                                <span className="text-[10px] text-accent font-bold tracking-wider uppercase"> {isHost ? 'Host' : 'Participant'}</span>
+                                            </div>
                                         </div>
-                                        <div className="pname">{p.userName}</div>
                                     </div>
-                                ))}
-                            </>
-                        )}
-
-                        {sidebarTab === 'chat' && (
-                            <>
-                                <div className="chat-messages" style={{ flex: 1 }}>
-                                    {chatMessages.map((msg, i) => (
-                                        <div key={i} className="chat-msg">
-                                            <div className="chat-sender">{msg.userName}</div>
-                                            <div className="chat-text">{msg.message}</div>
-                                            <div className="chat-time">
-                                                {new Date(msg.timestamp).toLocaleTimeString()}
+                                    <div className="my-4 px-2 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Other Participants ({peers.length})</div>
+                                    {peers.map((p) => (
+                                        <div key={p.socketId} className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-white/5 group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-white/40 group-hover:bg-accent/20 group-hover:text-accent transition-all">
+                                                    {p.userName?.[0]?.toUpperCase()}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold">{p.userName}</span>
+                                                    <span className="text-[10px] text-white/30">Online</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {!peerMediaStates[p.socketId]?.mic && <MicOff size={14} className="text-accent-danger" />}
+                                                {!peerMediaStates[p.socketId]?.camera && <VideoOff size={14} className="text-accent-danger" />}
                                             </div>
                                         </div>
                                     ))}
-                                    {chatMessages.length === 0 && (
-                                        <p
-                                            className="text-sm opacity-50 text-center"
-                                            style={{ marginTop: '2rem' }}
-                                        >
-                                            No messages yet
-                                        </p>
-                                    )}
                                 </div>
-                                <div className="chat-input-row">
-                                    <input
-                                        value={chatInput}
-                                        onChange={(e) => setChatInput(e.target.value)}
-                                        placeholder="Type a message..."
-                                        onKeyDown={(e) => e.key === 'Enter' && sendChat()}
-                                    />
-                                    <button
-                                        className="btn btn-primary"
-                                        style={{ padding: '0.5rem 0.8rem' }}
-                                        onClick={sendChat}
-                                    >
-                                        →
-                                    </button>
-                                </div>
-                            </>
-                        )}
+                            )}
 
-                        {sidebarTab === 'lobby' && isHost && (
-                            <HostLobbyPanel
-                                requests={pendingRequests}
-                                onApprove={approveRequest}
-                                onDeny={denyRequest}
-                                onBulkApprove={bulkApprove}
-                                onClose={() => setSidebarTab('participants')}
-                            />
-                        )}
+                            {sidebarTab === 'chat' && (
+                                <div className="flex flex-col h-full">
+                                    <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
+                                        {chatMessages.map((msg, i) => (
+                                            <div key={i} className={`flex flex-col gap-1 ${msg.userName === user?.name ? 'items-end' : 'items-start'}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-white/30">{msg.userName}</span>
+                                                    <span className="text-[8px] text-white/20">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                                <div className={`px-4 py-2 rounded-2xl text-sm ${msg.userName === user?.name ? 'bg-accent text-white rounded-tr-none shadow-lg shadow-accent/20' : 'bg-white/5 text-white/90 rounded-tl-none border border-white/5'}`}>
+                                                    {msg.message}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4 flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/5 focus-within:border-accent/50 transition-all">
+                                        <input
+                                            value={chatInput}
+                                            onChange={(e) => setChatInput(e.target.value)}
+                                            placeholder="Send message"
+                                            className="flex-1 bg-transparent border-none outline-none text-sm px-2 text-white placeholder:text-white/20"
+                                            onKeyDown={(e) => e.key === 'Enter' && sendChat()}
+                                        />
+                                        <button onClick={sendChat} className="p-2 bg-accent text-white rounded-xl shadow-lg shadow-accent/40 active:scale-95 transition-all">
+                                            <MessageSquare size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {sidebarTab === 'lobby' && isHost && (
+                                <div className="">
+                                    <HostLobbyPanel
+                                        requests={pendingRequests}
+                                        onApprove={approveRequest}
+                                        onDeny={denyRequest}
+                                        onBulkApprove={bulkApprove}
+                                        onClose={() => setSidebarTab('participants')}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            </main>
+
+            {/* Floating Controls */}
+            <MeetingControls
+                isMicOn={isMicOn}
+                isCamOn={isCamOn}
+                isScreenSharing={isScreenSharing}
+                handRaised={handRaised}
+                showSidebar={showSidebar}
+                onToggleMic={toggleMic}
+                onToggleCam={toggleCam}
+                onToggleScreenShare={isScreenSharing ? stopScreenShare : startScreenShare}
+                onToggleHand={toggleHand}
+                onToggleSidebar={() => setShowSidebar(!showSidebar)}
+                onOpenSettings={() => setShowSettings(true)}
+                onLeave={handleLeave}
+            />
+
+            {/* Device Settings Modal */}
+            <DeviceSettingsModal
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+                audioDevices={audioDevices}
+                videoDevices={videoDevices}
+                selectedAudioId={selectedAudioId}
+                selectedVideoId={selectedVideoId}
+                onAudioDeviceChange={toggleMic}
+                onVideoDeviceChange={toggleCam}
+                isMirrored={isMirrored}
+                onMirrorToggle={setIsMirrored}
+            />
 
             {/* ── TOAST (host only) ── */}
+            {isHost && latestRequest && (
+                <div className="fixed top-20 right-6 z-50">
+                    <JoinRequestToast
+                        request={latestRequest}
+                        onApprove={approveRequest}
+                        onDeny={(sid) => denyRequest(sid)}
+                        onDismiss={dismissToast}
+                    />
+                </div>
+            )}
+
+            {/* ── HOST CONTROLS (overlay bottom right) ── */}
             {isHost && (
-                <JoinRequestToast
-                    request={latestRequest}
-                    onApprove={approveRequest}
-                    onDeny={(sid) => denyRequest(sid)}
-                    onDismiss={dismissToast}
-                />
-            )}
-
-            {/* ── CONTROLS BAR ── */}
-            <div className="controls-bar">
-                <span className="timer">{formatTimer(elapsed)}</span>
-
-                <div className="controls-center">
-                    <button
-                        className={`btn btn-icon ${isMicOn ? 'active' : ''}`}
-                        onClick={() => void toggleMic()}
-                        title={isMicOn ? 'Mute Mic' : 'Unmute Mic'}
-                        aria-label={isMicOn ? 'Mute Mic' : 'Unmute Mic'}
-                    >
-                        {isMicOn ? <Mic size={20} /> : <MicOff size={20} />}
-                    </button>
-
-                    <button
-                        className={`btn btn-icon ${isCamOn ? 'active' : ''}`}
-                        onClick={() => void toggleCam()}
-                        title={isCamOn ? 'Turn Off Camera' : 'Turn On Camera'}
-                        aria-label={isCamOn ? 'Turn Off Camera' : 'Turn On Camera'}
-                    >
-                        {isCamOn ? <Video size={20} /> : <VideoOff size={20} />}
-                    </button>
-
-                    <button
-                        className={`btn btn-icon ${isScreenSharing ? 'active' : ''}`}
-                        onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                        title={isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
-                        aria-label={isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
-                    >
-                        <Monitor size={20} />
-                    </button>
-
-                    <button
-                        className={`btn btn-icon ${handRaised ? 'hand-raised-active' : ''}`}
-                        onClick={toggleHand}
-                        title={handRaised ? 'Lower Hand' : 'Raise Hand'}
-                        aria-label={handRaised ? 'Lower Hand' : 'Raise Hand'}
-                    >
-                        <Hand size={20} />
-                    </button>
-
-                    <button
-                        className="btn btn-icon danger"
-                        onClick={handleLeave}
-                        title="Leave Meeting"
-                        aria-label="Leave Meeting"
-                    >
-                        <PhoneOff size={20} />
-                    </button>
-                </div>
-
-                <div className="controls-right">
-                    {isHost && (
-                        <HostControlsPanel
-                            participants={peers.map((p) => ({
-                                socketId: p.socketId,
-                                userName: p.userName,
-                                role: 'participant',
-                            }))}
-                            isLocked={isLocked}
-                            onAction={hostAction}
-                        />
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/** Separate component to attach remote streams to video elements */
-function RemoteVideo({
-    peer,
-    mediaState,
-    isPresenter,
-}: {
-    peer: { socketId: string; userName: string; stream?: MediaStream };
-    mediaState: { camera: boolean; mic: boolean; screen: boolean };
-    isPresenter: boolean;
-}) {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const hasVideo = mediaState.camera || mediaState.screen;
-
-    useEffect(() => {
-        if (videoRef.current && peer.stream) {
-            videoRef.current.srcObject = peer.stream;
-            videoRef.current.play().catch((err) => {
-                console.error('[WebRTC] Remote video auto-play blocked:', err);
-            });
-        }
-    }, [hasVideo, peer.stream, peer.stream?.getTracks().map((t) => t.id).join(',')]);
-
-    return (
-        <div className={`video-tile ${mediaState.mic && !isPresenter ? 'speaking-glow' : ''}`}>
-            {hasVideo && peer.stream ? (
-                <video ref={videoRef} autoPlay playsInline />
-            ) : (
-                <div className="avatar-fallback">
-                    {peer.userName?.[0]?.toUpperCase() || '?'}
+                <div className="fixed bottom-24 right-6 z-20">
+                    <HostControlsPanel
+                        participants={peers.map((p) => ({
+                            socketId: p.socketId,
+                            userName: p.userName,
+                            role: 'participant' as const,
+                        }))}
+                        isLocked={isLocked}
+                        onAction={hostAction}
+                    />
                 </div>
             )}
-
-            {isPresenter && (
-                <div className="screen-share-badge">
-                    <Monitor size={12} /> {peer.userName}&apos;s Screen
-                </div>
-            )}
-
-            <div className="participant-name">
-                {peer.userName}
-                {!mediaState.mic && (
-                    <MicOff size={14} style={{ marginLeft: '6px', color: '#ef4444' }} />
-                )}
-            </div>
         </div>
     );
 }
