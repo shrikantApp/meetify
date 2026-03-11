@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
 import { MicOff, User } from 'lucide-react';
+import LocalVideo from './LocalVideo';
+import RemoteVideo from './RemoteVideo';
 
 interface VideoTileProps {
     stream?: MediaStream;
@@ -10,6 +11,7 @@ interface VideoTileProps {
     isMirrored?: boolean;
     isActiveSpeaker?: boolean;
     className?: string;
+    isScreenShare?: boolean;
 }
 
 export default function VideoTile({
@@ -18,43 +20,27 @@ export default function VideoTile({
     isLocal,
     isMicOn,
     isCamOn,
-    isMirrored,
     isActiveSpeaker,
     className = "",
+    isScreenShare,
 }: VideoTileProps) {
-    const videoRef = useRef<HTMLVideoElement>(null);
-
-    useEffect(() => {
-        const videoElement = videoRef.current;
-        if (!videoElement) return;
-
-        if (isCamOn && stream) {
-            // Check if it's already set to avoid glitching, but usually safe to re-assign if it's not playing
-            if (videoElement.srcObject !== stream) {
-                videoElement.srcObject = stream;
-                console.log(`[VideoTile] srcObject set successfully for ${userName} (${isLocal ? 'local' : 'remote'})`);
-            }
-
-            videoElement.play().then(() => {
-                console.log(`[VideoTile] video element playing for ${userName}`);
-            }).catch(err => {
-                console.warn(`[VideoTile] video play interrupted for ${userName}:`, err);
-            });
-        } else {
-            videoElement.srcObject = null;
-        }
-    }, [stream, isCamOn, isLocal, userName]);
-
     return (
         <div className={`relative w-full h-full bg-bg-card border-2 rounded-2xl overflow-hidden transition-all duration-500 shadow-2xl group ${isActiveSpeaker ? 'border-accent shadow-accent/20 scale-[1.01] z-10' : 'border-white/5'} ${className}`}>
-            {/* Video Element - Always mounted for instant toggle */}
-            <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted={isLocal}
-                className={`w-full h-full object-cover transition-opacity duration-500 ${isLocal && isMirrored ? 'mirror' : ''} ${isCamOn && stream ? 'opacity-100' : 'opacity-0 absolute'}`}
-            />
+            {/* Video Element - Modularized */}
+            {isCamOn && stream && (
+                isLocal ? (
+                    <LocalVideo 
+                        stream={stream} 
+                        className={isCamOn ? 'opacity-100' : 'opacity-0 absolute'} 
+                    />
+                ) : (
+                    <RemoteVideo 
+                        stream={stream} 
+                        isScreenShare={isScreenShare}
+                        className={isCamOn ? 'opacity-100' : 'opacity-0 absolute'} 
+                    />
+                )
+            )}
 
             {/* Placeholder - Shown when camera is off */}
             {(!isCamOn || !stream) && (

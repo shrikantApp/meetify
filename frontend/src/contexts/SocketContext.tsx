@@ -10,7 +10,7 @@ interface SocketContextType {
 
 const SocketContext = createContext<SocketContextType>({ socket: null, connected: false });
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+const SIGNALING_SERVER = import.meta.env.VITE_SIGNALING_SERVER || 'http://localhost:3000';
 
 export function SocketProvider({ children }: { children: ReactNode }) {
     const { token } = useAuth();
@@ -27,7 +27,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         }
 
         // Connect once per token
-        const newSocket = io(`${SOCKET_URL}/signaling`, {
+        const newSocket = io(`${SIGNALING_SERVER}/signaling`, {
             auth: { token },
             transports: ['websocket'],
         });

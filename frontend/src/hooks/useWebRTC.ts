@@ -5,22 +5,37 @@ import { Socket } from 'socket.io-client';
 // Reads from env so you can use your own TURN server in production.
 // Falls back to Google's public STUN servers for local dev.
 function buildIceConfig(): RTCConfiguration {
-    const servers: RTCIceServer[] = [];
-
+    const useWlanTunnel = import.meta.env.VITE_USE_WLAN_TUNNEL === 'true';
     const stunUrl = import.meta.env.VITE_STUN_URL || 'stun:stun.l.google.com:19302';
-    servers.push({ urls: stunUrl });
-
-    // Always add a second STUN for redundancy
-    servers.push({ urls: 'stun:stun1.l.google.com:19302' });
-
-    // Optional TURN server (required for symmetric NAT / corporate firewalls)
     const turnUrl = import.meta.env.VITE_TURN_URL;
-    if (turnUrl) {
-        servers.push({
-            urls: turnUrl,
-            username: import.meta.env.VITE_TURN_USERNAME || '',
-            credential: import.meta.env.VITE_TURN_CREDENTIAL || '',
-        });
+    const turnUser = import.meta.env.VITE_TURN_USERNAME;
+    const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
+
+    const servers: RTCIceServer[] = [{ urls: stunUrl }];
+
+    if (useWlanTunnel) {
+        console.log(`[WebRTC] WLAN Tunnel MODE: ENABLED`);
+        // In WLAN tunnel mode, we prefer the local TURN server if provided
+        if (turnUrl) {
+            console.log(`[WebRTC] Using LAN TURN server: ${turnUrl}`);
+            servers.push({
+                urls: turnUrl,
+                username: turnUser,
+                credential: turnCred
+            });
+        } else {
+            console.warn('[WebRTC] WLAN tunnel active but no TURN_URL provided');
+        }
+    } else {
+        // Production / Public mode
+        servers.push({ urls: 'stun:stun1.l.google.com:19302' });
+        if (turnUrl) {
+            servers.push({
+                urls: turnUrl,
+                username: turnUser,
+                credential: turnCred
+            });
+        }
     }
 
     return { iceServers: servers };
