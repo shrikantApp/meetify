@@ -31,7 +31,7 @@ services:
     container_name: meetify-backend
     env_file: ./backend/.env
     environment:
-      DB_HOST: postgres
+      POSTGRES_HOST: postgres
     ports:
       - '3000:3000'
     depends_on:

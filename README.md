@@ -45,11 +45,11 @@ Open **two browser tabs** (or an incognito window), log in with different users,
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `3000` | Server port |
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5432` | PostgreSQL port |
-| `DB_USER` | `postgres` | PostgreSQL user |
-| `DB_PASSWORD` | `password` | PostgreSQL password |
-| `DB_NAME` | `meetify` | Database name |
+| `POSTGRES_HOST` | `localhost` | PostgreSQL host |
+| `POSTGRES_PORT` | `5432` | PostgreSQL port |
+| `POSTGRES_USER` | `postgres` | PostgreSQL user |
+| `POSTGRES_PASSWORD` | `password` | PostgreSQL password |
+| `POSTGRES_DATABASE` | `meetify` | Database name |
 | `JWT_SECRET` | — | Secret for signing JWTs |
 | `JWT_EXPIRATION` | `7d` | Token expiry |
 | `FRONTEND_URL` | `http://localhost:5173` | CORS origin |
