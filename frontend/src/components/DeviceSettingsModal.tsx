@@ -30,7 +30,8 @@ export default function DeviceSettingsModal({
     const [volume, setVolume] = useState(0);
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
-    const streamRef = useRef<MediaStream | null>(null);
+    const audioStreamRef = useRef<MediaStream | null>(null);
+    const videoStreamRef = useRef<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // Audio Meter Logic
@@ -41,7 +42,7 @@ export default function DeviceSettingsModal({
                     const stream = await navigator.mediaDevices.getUserMedia({
                         audio: selectedAudioId ? { deviceId: { exact: selectedAudioId } } : true
                     });
-                    streamRef.current = stream;
+                    audioStreamRef.current = stream;
 
                     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
                     const analyser = audioContext.createAnalyser();
@@ -75,7 +76,8 @@ export default function DeviceSettingsModal({
         }
 
         return () => {
-            streamRef.current?.getTracks().forEach(t => t.stop());
+            audioStreamRef.current?.getTracks().forEach(t => t.stop());
+            audioStreamRef.current = null;
             audioContextRef.current?.close();
             analyserRef.current = null;
         };
@@ -89,6 +91,7 @@ export default function DeviceSettingsModal({
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: selectedVideoId ? { deviceId: { exact: selectedVideoId } } : true
                     });
+                    videoStreamRef.current = stream;
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
                     }
@@ -98,6 +101,14 @@ export default function DeviceSettingsModal({
             };
             startPreview();
         }
+
+        return () => {
+            videoStreamRef.current?.getTracks().forEach(t => t.stop());
+            videoStreamRef.current = null;
+            if (videoRef.current) {
+                videoRef.current.srcObject = null;
+            }
+        };
     }, [isOpen, activeTab, selectedVideoId]);
 
     if (!isOpen) return null;
