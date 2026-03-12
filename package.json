@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "@types/bcrypt": "^6.0.0"
+  },
+  "dependencies": {
+    "vite-tsconfig-paths": "^6.1.1"
   }
 }
