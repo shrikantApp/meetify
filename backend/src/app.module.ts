@@ -15,7 +15,7 @@ import { validationSchema } from './config/validation';
     // Load environment variables globally
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: `${__dirname}/../.env`,
+      envFilePath: process.env.NODE_ENV === "production" ? ".env.production" : ".env",
       validationSchema: validationSchema,
       load: [configuration],
     }),

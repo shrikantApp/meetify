@@ -63,6 +63,9 @@ npm run migration:run
 npm run migration:revert
 
 npm run migration:show
+
+
+ docker compose up -d --build
 ```
 
 ## Deployment
