@@ -30,7 +30,8 @@ RUN npm install --omit=dev
 
 # Copy built dist from builder
 COPY --from=builder /app/dist ./dist
+COPY .env /app/.env
 
 EXPOSE 4001
 
-CMD ["node", "dist/main.js"]
+CMD ["npm", "run", "start:prod"]

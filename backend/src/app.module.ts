@@ -9,13 +9,16 @@ import { SignalingModule } from './signaling/signaling.module';
 import database from './config/database';
 import { configuration } from './config/configuration';
 import { validationSchema } from './config/validation';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 @Module({
   imports: [
     // Load environment variables globally
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: process.env.NODE_ENV === "production" ? ".env.production" : ".env",
+      // envFilePath: process.env.NODE_ENV === "production" ? ".env.production" : ".env",
+      envFilePath: [`${__dirname}/../../.env`, `${__dirname}/../.env`, '.env'],
       validationSchema: validationSchema,
       load: [configuration],
     }),

@@ -4,10 +4,8 @@ dist
 .gitignore
 Dockerfile
 docker-compose.yml
-.env
 coverage
 
 node_modules
 dist
 *.log
-.env
