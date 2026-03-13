@@ -206,7 +206,7 @@ export default function DeviceSettingsModal({
                                     autoPlay
                                     playsInline
                                     muted
-                                    className={`w-full h-full object-cover ${isMirrored ? 'mirror' : ''}`}
+                                    className={`w-full h-full object-cover ${isMirrored ? 'mirrored' : ''}`}
                                 />
                                 <div className="absolute top-4 right-4 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-[10px] font-bold text-white tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-all">
                                     Camera Preview

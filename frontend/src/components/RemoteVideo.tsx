@@ -17,9 +17,10 @@ export default function RemoteVideo({ stream, className = "", isScreenShare }: R
 
     useEffect(() => {
         if (videoRef.current && stream) {
+            console.log(`[WebRTC] RemoteVideo updating srcObject for ${isScreenShare ? 'ScreenShare' : 'Camera'}`);
             videoRef.current.srcObject = stream;
         }
-    }, [stream]);
+    }, [stream, isScreenShare]);
 
     return (
         <video

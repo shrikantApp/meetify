@@ -438,6 +438,7 @@ export default function MeetingRoomPage() {
                             isLocal={true}
                             isMicOn={isMicOn}
                             isCamOn={isCamOn}
+                            isScreenShare={isScreenSharing}
                             isMirrored={isMirrored}
                             isActiveSpeaker={activeSpeakerId === 'local'}
                         />
@@ -450,6 +451,7 @@ export default function MeetingRoomPage() {
                                 userName={p.userName}
                                 isMicOn={peerMediaStates[p.socketId]?.mic ?? true}
                                 isCamOn={peerMediaStates[p.socketId]?.camera ?? true}
+                                isScreenShare={peerMediaStates[p.socketId]?.screen ?? false}
                                 isActiveSpeaker={activeSpeakerId === p.socketId}
                             />
                         ))}

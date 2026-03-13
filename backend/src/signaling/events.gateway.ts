@@ -71,7 +71,7 @@ type AuthenticatedSocket = Socket & { user?: AuthPayload };
 
 @WebSocketGateway({
     cors: {
-        origin: process.env.ALLOW_WEBSITE_URLS || 'http://localhost:5173',
+        origin: process.env.ALLOW_WEBSITE_URLS?.split?.(",") || 'http://localhost:5173',
         credentials: true,
     },
     namespace: '/signaling',

@@ -23,32 +23,35 @@ export default function VideoTile({
     isActiveSpeaker,
     className = "",
     isScreenShare,
+    isMirrored,
 }: VideoTileProps) {
     return (
         <div className={`relative w-full h-full bg-bg-card border-2 rounded-2xl overflow-hidden transition-all duration-500 shadow-2xl group ${isActiveSpeaker ? 'border-accent shadow-accent/20 scale-[1.01] z-10' : 'border-white/5'} ${className}`}>
             {/* Video Element - Modularized */}
-            {isCamOn && stream && (
+            {(isCamOn || isScreenShare) && stream && (
                 isLocal ? (
-                    <LocalVideo 
-                        stream={stream} 
-                        className={isCamOn ? 'opacity-100' : 'opacity-0 absolute'} 
+                    <LocalVideo
+                        stream={stream}
+                        isMirrored={isMirrored}
+                        isScreenShare={isScreenShare}
+                        className={(isCamOn || isScreenShare) ? 'opacity-100' : 'opacity-0 absolute'}
                     />
                 ) : (
-                    <RemoteVideo 
-                        stream={stream} 
+                    <RemoteVideo
+                        stream={stream}
                         isScreenShare={isScreenShare}
-                        className={isCamOn ? 'opacity-100' : 'opacity-0 absolute'} 
+                        className={(isCamOn || isScreenShare) ? 'opacity-100' : 'opacity-0 absolute'}
                     />
                 )
             )}
 
-            {/* Placeholder - Shown when camera is off */}
-            {(!isCamOn || !stream) && (
+            {/* Placeholder - Shown when neither camera nor screen share is on */}
+            {(!isCamOn && !isScreenShare || !stream) && (
                 <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-6 bg-gradient-to-br from-bg-secondary to-bg-card z-10">
                     <div className="w-24 h-24 rounded-full bg-accent/20 flex items-center justify-center text-accent text-4xl font-bold shadow-lg shadow-accent/10 transition-transform duration-500 group-hover:scale-110">
                         {userName ? userName[0].toUpperCase() : <User />}
                     </div>
-                    {!isCamOn && (
+                    {!isCamOn && !isScreenShare && (
                         <div className="flex items-center gap-2 px-3 py-1 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-[10px] font-bold text-white/60 tracking-wider uppercase">
                             Camera is off
                         </div>

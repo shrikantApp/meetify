@@ -139,6 +139,12 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         const queue = pendingCandidates.current.get(socketId);
         if (!queue?.length) return;
 
+        // Ensure we have a remote description before adding candidates
+        if (!pc.remoteDescription?.type) {
+            debugLog(`[WebRTC] Postponing flush; still no remoteDescription for ${socketId}`);
+            return;
+        }
+
         for (const candidate of queue) {
             try {
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -551,10 +557,15 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     // had to fall back to addTrack (which DOES change the SDP).
     const replaceTrackInPeers = useCallback(async (kind: 'video' | 'audio', newTrack: MediaStreamTrack) => {
         const promises = Array.from(peerConnections.current.entries()).map(async ([socketId, pc]) => {
-            // Find sender by track kind, or by transceiver receiver kind
+            // Find sender by track kind
             let sender = pc.getSenders().find((s) => s.track?.kind === kind);
+            
+            // Fallback to searching transceivers if sender with track not found
             if (!sender) {
-                const transceiver = pc.getTransceivers().find(t => t.receiver.track.kind === kind);
+                const transceiver = pc.getTransceivers().find(t => 
+                    (t.sender.track?.kind === kind) || 
+                    (t.receiver.track?.kind === kind)
+                );
                 if (transceiver) sender = transceiver.sender;
             }
 
@@ -565,6 +576,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                     return;
                 } catch (error) {
                     console.error(`[WebRTC] replaceTrack(${kind}) failed for ${socketId}:`, error);
+                    // If replaceTrack fails, we might need a full renegotiation fallback below
                 }
             }
 
@@ -573,7 +585,13 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 return;
             }
 
-            debugLog(`[WebRTC] addTrack(${kind}) fallback for ${socketId}`);
+            debugLog(`[WebRTC] addTrack/renegotiate fallback for ${socketId} (kind=${kind})`);
+            // Remove old track of same kind if it exists but replaceTrack failed
+            const oldSender = pc.getSenders().find(s => s.track?.kind === kind);
+            if (oldSender) {
+                pc.removeTrack(oldSender);
+            }
+            
             pc.addTrack(newTrack, localStreamRef.current);
             await triggerRenegotiation(pc, socketId);
         });
@@ -747,13 +765,8 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
             const screenTrack = screenStream.getVideoTracks()[0];
 
-            localStreamRef.current?.getVideoTracks().forEach((t) => t.stop());
             await replaceTrackInPeers('video', screenTrack);
-
-            if (localStreamRef.current) {
-                localStreamRef.current.getVideoTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
-                localStreamRef.current.addTrack(screenTrack);
-            }
+            updateLocalStreamTracks('video', screenTrack);
 
             screenTrack.onended = () => stopScreenShare();
             setIsScreenSharing(true);
@@ -775,12 +788,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             }
 
             await replaceTrackInPeers('video', replacementTrack);
-
-            if (localStreamRef.current) {
-                localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
-                localStreamRef.current.getVideoTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
-                localStreamRef.current.addTrack(replacementTrack);
-            }
+            updateLocalStreamTracks('video', replacementTrack);
 
             setIsScreenSharing(false);
             socket?.emit('screen-share-stop', { roomId, isCamOn });

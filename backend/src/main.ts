@@ -9,7 +9,7 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const port = process.env.PORT || 4008;
-  const AllowedURL = process?.env?.ALLOW_WEBSITE_URLS//?.split?.(',');
+  const AllowedURL = process?.env?.ALLOW_WEBSITE_URLS?.split?.(',');
 
   app.use(
     helmet({
