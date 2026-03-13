@@ -20,6 +20,9 @@ async function bootstrap() {
   app.setViewEngine('pug');
   app.setBaseViewsDir(join(__dirname, '../..', 'views'));
   app.useStaticAssets(join(__dirname, '..', 'public'));
+  app.useStaticAssets(join(process.cwd(), 'recordings'), {
+    prefix: '/api/recordings',
+  });
   app.use(urlencoded({ extended: true, limit: '50mb', parameterLimit: 50000 }));
   app.setGlobalPrefix('api');
   app.enableCors({

@@ -19,26 +19,35 @@ export class RecordingsService {
     }
 
     async saveRecording(meetingId: string, hostId: string, file: Express.Multer.File, duration: number) {
-        const meetingDir = path.join(this.recordingsPath, meetingId);
-        if (!fs.existsSync(meetingDir)) {
-            fs.mkdirSync(meetingDir, { recursive: true });
+        try {
+            const meetingDir = path.join(this.recordingsPath, meetingId);
+            if (!fs.existsSync(meetingDir)) {
+                fs.mkdirSync(meetingDir, { recursive: true });
+            }
+
+            const extension = path.extname(file.originalname) || '.webm';
+            const fileName = `recording-${Date.now()}${extension}`;
+            const filePath = path.join(meetingId, fileName);
+            const absolutePath = path.join(this.recordingsPath, filePath);
+
+            console.log(`[RecordingsService] Saving file to ${absolutePath}`);
+            fs.writeFileSync(absolutePath, file.buffer);
+
+            const recording = this.recordingsRepository.create({
+                meetingId,
+                hostId,
+                filePath,
+                fileSize: file.size,
+                duration: Math.round(duration),
+            });
+
+            const saved = await this.recordingsRepository.save(recording);
+            console.log(`[RecordingsService] Saved metadata to DB with ID: ${saved.id}`);
+            return saved;
+        } catch (err) {
+            console.error('[RecordingsService] Error saving recording:', err);
+            throw err;
         }
-
-        const fileName = `recording-${Date.now()}.webm`;
-        const filePath = path.join(meetingId, fileName);
-        const absolutePath = path.join(this.recordingsPath, filePath);
-
-        fs.writeFileSync(absolutePath, file.buffer);
-
-        const recording = this.recordingsRepository.create({
-            meetingId,
-            hostId,
-            filePath,
-            fileSize: file.size,
-            duration,
-        });
-
-        return this.recordingsRepository.save(recording);
     }
 
     async getRecordingsByMeeting(meetingId: string) {

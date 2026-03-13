@@ -6,25 +6,25 @@ export class MeetingRecording {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column()
+    @Column({ name: 'meeting_id' })
     meetingId: string;
 
-    @Column()
+    @Column({ name: 'host_id' })
     hostId: string;
 
-    @Column()
+    @Column({ name: 'file_path' })
     filePath: string;
 
-    @Column({ type: 'bigint' })
+    @Column({ name: 'file_size', type: 'bigint' })
     fileSize: number;
 
-    @Column({ type: 'int' })
+    @Column({ name: 'duration', type: 'int' })
     duration: number; // in seconds
 
-    @CreateDateColumn()
+    @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 
     @ManyToOne(() => Meeting)
-    @JoinColumn({ name: 'meetingId' })
+    @JoinColumn({ name: 'meeting_id' })
     meeting: Meeting;
 }

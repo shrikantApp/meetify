@@ -4,16 +4,20 @@ import axios from 'axios';
 
 interface UseRecordingProps {
     socket: Socket | null;
-    roomId: string;
+    meetingCode: string;
+    meetingId: string;
     hostId: string;
     localStream: MediaStream | null;
     peers: any[]; // RemotePeer[]
 }
 
-export function useRecording({ socket, roomId, hostId, localStream, peers }: UseRecordingProps) {
+export function useRecording({ socket, meetingCode, meetingId, hostId, localStream, peers }: UseRecordingProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
+    const [error, setError] = useState<string | null>(null);
+
+    const clearError = () => setError(null);
     const durationRef = useRef(0);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
@@ -22,37 +26,57 @@ export function useRecording({ socket, roomId, hostId, localStream, peers }: Use
 
     const startRecording = useCallback(async () => {
         try {
+            setError(null);
             // 1. Capture Screen
+            // Note: On some browsers and OS, audio: true might fail if no audio source is selected
             const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { frameRate: 30 },
-                audio: true // System/Tab audio
+                video: { 
+                    displaySurface: 'browser', // Hint for best experience
+                    frameRate: { ideal: 30, max: 60 } 
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            }).catch(e => {
+                if (e.name === 'NotAllowedError') {
+                    throw new Error('Permission to share screen was denied. Please allow screen sharing to record.');
+                }
+                throw e;
             });
+
             screenStreamRef.current = screenStream;
 
             // 2. Prepare Audio Merging
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            await audioCtx.resume();
             const destination = audioCtx.createMediaStreamDestination();
 
             // Source 1: System/Tab Audio from getDisplayMedia
-            if (screenStream.getAudioTracks().length > 0) {
-                const systemSource = audioCtx.createMediaStreamSource(new MediaStream([screenStream.getAudioTracks()[0]]));
+            const systemAudioTracks = screenStream.getAudioTracks();
+            if (systemAudioTracks.length > 0) {
+                const systemSource = audioCtx.createMediaStreamSource(new MediaStream([systemAudioTracks[0]]));
                 systemSource.connect(destination);
             }
 
             // Source 2: Local Microphone
-            if (localStream && localStream.getAudioTracks().length > 0) {
-                const localMicTrack = localStream.getAudioTracks().find(t => !t.label.includes('Silent'));
-                if (localMicTrack) {
-                    const localSource = audioCtx.createMediaStreamSource(new MediaStream([localMicTrack]));
+            if (localStream && localStream.active) {
+                const micTracks = localStream.getAudioTracks();
+                if (micTracks.length > 0) {
+                    const localSource = audioCtx.createMediaStreamSource(new MediaStream([micTracks[0]]));
                     localSource.connect(destination);
                 }
             }
 
             // Source 3: Remote Participants
             peers.forEach(peer => {
-                if (peer.stream && peer.stream.getAudioTracks().length > 0) {
-                    const peerSource = audioCtx.createMediaStreamSource(peer.stream);
-                    peerSource.connect(destination);
+                if (peer.stream && peer.stream.active) {
+                    const peerAudioTracks = peer.stream.getAudioTracks();
+                    if (peerAudioTracks.length > 0) {
+                        const peerSource = audioCtx.createMediaStreamSource(new MediaStream([peerAudioTracks[0]]));
+                        peerSource.connect(destination);
+                    }
                 }
             });
 
@@ -64,11 +88,21 @@ export function useRecording({ socket, roomId, hostId, localStream, peers }: Use
             const combinedStream = new MediaStream(combinedTracks);
 
             chunksRef.current = [];
-            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-                ? 'video/webm;codecs=vp9,opus'
-                : 'video/webm';
+            let mimeType = 'video/webm;codecs=vp8,opus';
+            let extension = '.webm';
 
-            const recorder = new MediaRecorder(combinedStream, { mimeType });
+            if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264,opus')) {
+                mimeType = 'video/mp4;codecs=h264,opus';
+                extension = '.mp4';
+            } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+                mimeType = 'video/webm;codecs=vp8,opus';
+                extension = '.webm';
+            }
+
+            const recorder = new MediaRecorder(combinedStream, { 
+                mimeType,
+                videoBitsPerSecond: 2500000 // 2.5 Mbps for decent quality
+            });
             mediaRecorderRef.current = recorder;
 
             recorder.ondataavailable = (e) => {
@@ -78,18 +112,25 @@ export function useRecording({ socket, roomId, hostId, localStream, peers }: Use
             };
 
             recorder.onstop = async () => {
-                const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+                const blob = new Blob(chunksRef.current, { type: mimeType });
                 const formData = new FormData();
-                formData.append('recordingFile', blob, `recording-${Date.now()}.webm`);
-                formData.append('meetingId', roomId);
+                formData.append('recordingFile', blob, `recording-${Date.now()}${extension}`);
+                formData.append('meetingId', meetingId);
                 formData.append('hostId', hostId);
                 formData.append('duration', durationRef.current.toString());
 
+                setIsRecording(false); // UI state update earlier
+
                 try {
-                    await axios.post('/api/meeting-recording', formData);
+                    await axios.post('/api/meeting-recording', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                        maxContentLength: Infinity,
+                        maxBodyLength: Infinity
+                    });
                     console.log('[Recording] Uploaded successfully');
-                } catch (err) {
+                } catch (err: any) {
                     console.error('[Recording] Upload failed', err);
+                    setError(err.response?.data?.message || 'Failed to upload recording to server.');
                 }
 
                 // Cleanup
@@ -105,7 +146,7 @@ export function useRecording({ socket, roomId, hostId, localStream, peers }: Use
                 stopRecording();
             };
 
-            recorder.start(1000); // 1 second chunks for reliability
+            recorder.start(1000); 
             setIsRecording(true);
             setIsPaused(false);
             setRecordingDuration(0);
@@ -119,12 +160,14 @@ export function useRecording({ socket, roomId, hostId, localStream, peers }: Use
                 });
             }, 1000);
 
-            socket?.emit('host-action', { roomId, action: 'recording-start' });
+            socket?.emit('host-action', { roomId: meetingCode, action: 'recording-start' });
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('[Recording] Failed to start', err);
+            setError(err.message || 'An unexpected error occurred while starting the recording.');
+            setIsRecording(false);
         }
-    }, [socket, roomId, hostId]);
+    }, [socket, meetingCode, meetingId, hostId]);
 
     const stopRecording = useCallback(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -132,9 +175,9 @@ export function useRecording({ socket, roomId, hostId, localStream, peers }: Use
             setIsRecording(false);
             setIsPaused(false);
             if (timerRef.current) clearInterval(timerRef.current);
-            socket?.emit('host-action', { roomId, action: 'recording-stop' });
+            socket?.emit('host-action', { roomId: meetingCode, action: 'recording-stop' });
         }
-    }, [socket, roomId]);
+    }, [socket, meetingCode]);
 
     const pauseRecording = useCallback(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -167,5 +210,7 @@ export function useRecording({ socket, roomId, hostId, localStream, peers }: Use
         stopRecording,
         pauseRecording,
         resumeRecording,
+        error,
+        clearError,
     };
 }

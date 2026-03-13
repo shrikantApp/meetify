@@ -152,10 +152,12 @@ export default function MeetingRoomPage() {
     } = useWebRTC({ socket, roomId: meetingCode || '', userName: user?.name || 'Guest' });
 
     const {
-        isRecording, isPaused, recordingDuration, startRecording, stopRecording, pauseRecording, resumeRecording
+        isRecording, isPaused, recordingDuration, startRecording, stopRecording, pauseRecording, resumeRecording,
+        error: recordingError, clearError: clearRecordingError
     } = useRecording({ 
         socket, 
-        roomId: meetingCode || '', 
+        meetingCode: meetingCode || '', 
+        meetingId: meeting?.id || '',
         hostId: user?.id || '',
         localStream,
         peers
@@ -459,6 +461,26 @@ export default function MeetingRoomPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* ── RECORDING ERROR ALERT ── */}
+                {recordingError && (
+                    <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[60] w-full max-w-md animate-in slide-in-from-top-4 duration-300">
+                        <div className="flex items-center justify-between gap-4 p-4 bg-accent-danger/90 backdrop-blur-md text-white rounded-2xl shadow-2xl border border-white/10">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-xl">
+                                    <Info size={18} />
+                                </div>
+                                <p className="text-sm font-bold">{recordingError}</p>
+                            </div>
+                            <button 
+                                onClick={clearRecordingError}
+                                className="p-2 hover:bg-white/10 rounded-lg transition-all"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex items-center gap-4">
                     {(isRecording || isRemoteRecording) && (
