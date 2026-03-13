@@ -9,6 +9,7 @@ import { SignalingModule } from './signaling/signaling.module';
 import database from './config/database';
 import { configuration } from './config/configuration';
 import { validationSchema } from './config/validation';
+import { RecordingsModule } from './recordings/recordings.module';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -49,6 +50,7 @@ dotenv.config();
     UsersModule,
     MeetingsModule,
     SignalingModule,
+    RecordingsModule,
   ],
 })
 export class AppModule { }

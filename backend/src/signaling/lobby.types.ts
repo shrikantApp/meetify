@@ -55,17 +55,30 @@ export interface BulkApprovePayload {
 
 export type HostActionType =
     | 'mute-all'
+    | 'mute-participant'
+    | 'disable-camera'
+    | 'toggle-lobby'
     | 'remove-participant'
     | 'promote-co-host'
     | 'demote-co-host'
     | 'lock-room'
     | 'unlock-room'
-    | 'end-meeting';
+    | 'end-meeting'
+    | 'recording-start'
+    | 'recording-stop';
 
 export interface HostActionPayload {
     roomId: string;
     action: HostActionType;
     targetSocketId?: string;
+}
+
+export type ParticipantActionType = 'mute' | 'stop-video' | 'remove';
+
+export interface ParticipantActionPayload {
+    roomId: string;
+    targetUserId: string; // This will map to targetSocketId in our implementation
+    action: ParticipantActionType;
 }
 
 export interface RaiseHandPayload {

@@ -78,7 +78,10 @@ export default function DeviceSettingsModal({
         return () => {
             audioStreamRef.current?.getTracks().forEach(t => t.stop());
             audioStreamRef.current = null;
-            audioContextRef.current?.close();
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close().catch(console.error);
+            }
+            audioContextRef.current = null;
             analyserRef.current = null;
         };
     }, [isOpen, activeTab, selectedAudioId]);

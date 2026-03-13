@@ -1,7 +1,7 @@
 
 import {
     Mic, MicOff, Video, VideoOff, Monitor,
-    Hand, Users, PhoneOff, Settings
+    Hand, Users, PhoneOff, Settings, Circle, Play, Pause
 } from 'lucide-react';
 
 interface MeetingControlsProps {
@@ -10,12 +10,18 @@ interface MeetingControlsProps {
     isScreenSharing: boolean;
     handRaised: boolean;
     showSidebar: boolean;
+    isHost: boolean;
+    isRecording: boolean;
+    isPaused: boolean;
     onToggleMic: () => void;
     onToggleCam: () => void;
     onToggleScreenShare: () => void;
     onToggleHand: () => void;
     onToggleSidebar: () => void;
     onOpenSettings: () => void;
+    onToggleRecording: () => void;
+    onPauseRecording: () => void;
+    onResumeRecording: () => void;
     onLeave: () => void;
 }
 
@@ -25,12 +31,18 @@ export default function MeetingControls({
     isScreenSharing,
     handRaised,
     showSidebar,
+    isHost,
+    isRecording,
+    isPaused,
     onToggleMic,
     onToggleCam,
     onToggleScreenShare,
     onToggleHand,
     onToggleSidebar,
     onOpenSettings,
+    onToggleRecording,
+    onPauseRecording,
+    onResumeRecording,
     onLeave,
 }: MeetingControlsProps) {
     return (
@@ -90,6 +102,32 @@ export default function MeetingControls({
                         Settings
                     </div>
                 </button>
+
+                {isHost && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onToggleRecording}
+                            className={`group relative p-3.5 rounded-full transition-all duration-300 ${isRecording ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                        >
+                            <Circle size={20} className={isRecording ? 'fill-current' : ''} />
+                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                {isRecording ? 'Stop Recording' : 'Record Meeting'}
+                            </div>
+                        </button>
+                        
+                        {isRecording && (
+                            <button
+                                onClick={isPaused ? onResumeRecording : onPauseRecording}
+                                className="group relative p-3.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"
+                            >
+                                {isPaused ? <Play size={20} className="fill-current" /> : <Pause size={20} className="fill-current" />}
+                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                    {isPaused ? 'Resume Recording' : 'Pause Recording'}
+                                </div>
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Utility Controls */}

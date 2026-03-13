@@ -1508,7 +1508,7 @@ a:hover {
 
 .host-controls-menu {
   position: absolute;
-  bottom: calc(100% + 0.5rem);
+  top: calc(100% + 0.5rem);
   right: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);

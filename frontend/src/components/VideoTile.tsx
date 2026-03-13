@@ -1,4 +1,4 @@
-import { MicOff, User } from 'lucide-react';
+import { MicOff, User, Pin } from 'lucide-react';
 import LocalVideo from './LocalVideo';
 import RemoteVideo from './RemoteVideo';
 
@@ -12,6 +12,9 @@ interface VideoTileProps {
     isActiveSpeaker?: boolean;
     className?: string;
     isScreenShare?: boolean;
+    isPinned?: boolean;
+    onClick?: () => void;
+    onContextMenu?: () => void;
 }
 
 export default function VideoTile({
@@ -24,9 +27,21 @@ export default function VideoTile({
     className = "",
     isScreenShare,
     isMirrored,
+    isPinned,
+    onClick,
+    onContextMenu,
 }: VideoTileProps) {
     return (
-        <div className={`relative w-full h-full bg-bg-card border-2 rounded-2xl overflow-hidden transition-all duration-500 shadow-2xl group ${isActiveSpeaker ? 'border-accent shadow-accent/20 scale-[1.01] z-10' : 'border-white/5'} ${className}`}>
+        <div 
+            onClick={onClick}
+            onContextMenu={(e) => {
+                if (onContextMenu) {
+                    e.preventDefault();
+                    onContextMenu();
+                }
+            }}
+            className={`relative w-full h-full bg-bg-card border-2 rounded-2xl overflow-hidden transition-all duration-500 shadow-2xl group cursor-pointer ${isActiveSpeaker ? 'border-accent shadow-accent/20 scale-[1.01] z-10' : isPinned ? 'border-accent shadow-accent/20' : 'border-white/5'} ${className}`}
+        >
             {/* Video Element - Modularized */}
             {(isCamOn || isScreenShare) && stream && (
                 isLocal ? (
@@ -77,6 +92,11 @@ export default function VideoTile({
                         <div className="w-1 bg-accent rounded-full animate-[sound-bar_0.8s_ease-in-out_infinite] px-0.5" />
                         <div className="w-1 bg-accent rounded-full animate-[sound-bar_1.2s_ease-in-out_infinite] px-0.5" />
                         <div className="w-1 bg-accent rounded-full animate-[sound-bar_1s_ease-in-out_infinite] px-0.5" />
+                    </div>
+                )}
+                {isPinned && (
+                    <div className="p-2 bg-accent/20 rounded-xl text-accent border border-accent/20 backdrop-blur-md">
+                        <Pin size={14} className="fill-accent" />
                     </div>
                 )}
             </div>

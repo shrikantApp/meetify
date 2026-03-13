@@ -16,6 +16,8 @@ import {
 import MeetingControls from '../components/MeetingControls';
 import VideoTile from '../components/VideoTile';
 import DeviceSettingsModal from '../components/DeviceSettingsModal';
+import ParticipantControlModal from '../components/ParticipantControlModal';
+import { useRecording } from '../hooks/useRecording';
 
 interface ChatMessage {
     message: string;
@@ -51,6 +53,7 @@ export default function MeetingRoomPage() {
     const [meeting, setMeeting] = useState<MeetingInfo | null>(null);
     const [loadingInfo, setLoadingInfo] = useState(true);
     const [infoError, setInfoError] = useState('');
+    const [isRemoteRecording, setIsRemoteRecording] = useState(false);
 
     useEffect(() => {
         if (!meetingCode || !token) return;
@@ -68,7 +71,6 @@ export default function MeetingRoomPage() {
     }, [meetingCode, token]);
 
     const isHost = meeting ? meeting.host.id === user?.id : false;
-
     // ── Lobby Hook ───────────────────────────────────────────────────────
     const {
         lobbyStatus,
@@ -130,30 +132,42 @@ export default function MeetingRoomPage() {
         lobbyStatus === 'admitted';
 
     const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
-    const [sidebarTab, setSidebarTab] = useState<'participants' | 'chat' | 'lobby'>('participants');
+    const [sidebarTab, setSidebarTab] = useState<'participants' | 'chat' | 'lobby' | null>(null);
     const [showSettings, setShowSettings] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [pinnedPeerId, setPinnedPeerId] = useState<string | null>(null);
+    const [selectedParticipant, setSelectedParticipant] = useState<{
+        socketId: string;
+        userName: string;
+        isMicOn: boolean;
+        isCamOn: boolean;
+        isPinned: boolean;
+    } | null>(null);
+    const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
 
     const {
+        localStream, peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing,
+        audioDevices, videoDevices, selectedAudioId, selectedVideoId, isMirrored, setIsMirrored,
+        joinRoom, leaveRoom, toggleMic, toggleCam, startScreenShare, stopScreenShare,
+    } = useWebRTC({ socket, roomId: meetingCode || '', userName: user?.name || 'Guest' });
+
+    const {
+        isRecording, isPaused, recordingDuration, startRecording, stopRecording, pauseRecording, resumeRecording
+    } = useRecording({ 
+        socket, 
+        roomId: meetingCode || '', 
+        hostId: user?.id || '',
         localStream,
-        peers,
-        peerMediaStates,
-        isMicOn,
-        isCamOn,
-        isScreenSharing,
-        audioDevices,
-        videoDevices,
-        selectedAudioId,
-        selectedVideoId,
-        isMirrored,
-        setIsMirrored,
-        joinRoom,
-        leaveRoom,
-        toggleMic,
-        toggleCam,
-        startScreenShare,
-        stopScreenShare,
-    } = useWebRTC({ socket, roomId: meetingCode!, userName: user?.name || 'Guest' });
+        peers
+    });
+
+    const handleToggleRecording = () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    };
 
     // Clock effect
     useEffect(() => {
@@ -182,18 +196,17 @@ export default function MeetingRoomPage() {
 
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
-    const [copied, setCopied] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [handRaised, setHandRaised] = useState(false);
-    const [showSidebar, setShowSidebar] = useState(true);
+    const [showSidebar, setShowSidebar] = useState(false);
 
     // Active speaker logic: priority to screen sharer, then first peer with mic on, then local
     useEffect(() => {
-        const screenSharer = peers.find(p => peerMediaStates[p.socketId]?.screen);
+        const screenSharer = peers.find((p: any) => peerMediaStates[p.socketId]?.screen);
         if (screenSharer) {
             setActiveSpeakerId(screenSharer.socketId);
         } else {
-            const speaker = peers.find(p => peerMediaStates[p.socketId]?.mic);
+            const speaker = peers.find((p: any) => peerMediaStates[p.socketId]?.mic);
             if (speaker) {
                 setActiveSpeakerId(speaker.socketId);
             } else if (isMicOn || isCamOn || isScreenSharing) {
@@ -234,11 +247,7 @@ export default function MeetingRoomPage() {
         const handler = (data: { action: string; reason?: string; targetSocketId?: string }) => {
             switch (data.action) {
                 case 'mute-all':
-                    // If this is not the host, mute locally
-                    if (!isHost) {
-                        // Mute mic via the hook
-                        if (isMicOn) void toggleMic();
-                    }
+                    // Handled by hook's force-mute listener
                     break;
                 case 'removed':
                     leaveRoom();
@@ -257,7 +266,16 @@ export default function MeetingRoomPage() {
             }
         };
         socket.on('host-action-applied', handler);
-        return () => { socket.off('host-action-applied', handler); };
+
+        const recordingHandler = (data: { isRecording: boolean }) => {
+            setIsRemoteRecording(data.isRecording);
+        };
+        socket.on('recording-state-changed', recordingHandler);
+
+        return () => {
+            socket.off('host-action-applied', handler);
+            socket.off('recording-state-changed');
+        };
     }, [socket, isHost, isMicOn, toggleMic, leaveRoom, navigate]);
 
     // ── Refresh Confirmation ─────────────────────────────────────────────
@@ -290,6 +308,7 @@ export default function MeetingRoomPage() {
         navigate('/dashboard');
     };
 
+    const [copied, setCopied] = useState(false);
     const copyLink = () => {
         navigator.clipboard.writeText(window.location.href);
         setCopied(true);
@@ -302,6 +321,46 @@ export default function MeetingRoomPage() {
         setHandRaised(newState);
         socket.emit('raise-hand', { roomId: meetingCode, raised: newState });
     }, [socket, meetingCode, handRaised]);
+
+    const handleParticipantAction = useCallback((action: string, sid: string) => {
+        if (sid === 'local') return;
+
+        if (action === 'pin') {
+            setPinnedPeerId(sid);
+            setIsParticipantModalOpen(false);
+        } else if (action === 'unpin') {
+            setPinnedPeerId(null);
+            setIsParticipantModalOpen(false);
+        } else if (isHost && socket) {
+            // Map actions to the specific contract: mute, stop-video, remove
+            let targetAction = action;
+            if (action === 'disable-camera') targetAction = 'stop-video';
+            if (action === 'remove-participant') targetAction = 'remove';
+
+            socket.emit('participant-action', {
+                roomId: meetingCode,
+                targetUserId: sid,
+                action: targetAction,
+            });
+
+            if (targetAction === 'remove') {
+                setIsParticipantModalOpen(false);
+                setSelectedParticipant(null);
+            }
+        }
+    }, [isHost, socket, meetingCode]);
+
+    const openParticipantModal = useCallback((p: any) => {
+        if (!isHost) return;
+        setSelectedParticipant({
+            socketId: p.socketId,
+            userName: p.userName,
+            isMicOn: p.isMicOn,
+            isCamOn: p.isCamOn,
+            isPinned: p.socketId === pinnedPeerId,
+        });
+        setIsParticipantModalOpen(true);
+    }, [isHost, pinnedPeerId]);
 
     // ── KEYBOARD SHORTCUTS ───────────────────────────────────────────────
     useEffect(() => {
@@ -323,6 +382,11 @@ export default function MeetingRoomPage() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [toggleMic, toggleCam]);
+
+    const onToggleSidebar = () => {
+        setShowSidebar(!showSidebar);
+        setSidebarTab(showSidebar ? null : 'participants')
+    }
 
     // ── Loading / Error States ───────────────────────────────────────────
 
@@ -397,6 +461,14 @@ export default function MeetingRoomPage() {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {(isRecording || isRemoteRecording) && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full animate-pulse mr-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">
+                                Recording {isRecording && `${Math.floor(recordingDuration / 60)}:${(recordingDuration % 60).toString().padStart(2, '0')}`}
+                            </span>
+                        </div>
+                    )}
                     <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
                         <Users size={16} className="text-text-secondary" />
                         <span className="text-sm font-bold text-white/90">{peers.length + 1}</span>
@@ -408,16 +480,18 @@ export default function MeetingRoomPage() {
                         {copied ? <Check size={14} className="text-accent-success" /> : <Info size={14} className="group-hover:text-accent" />}
                         <span>{copied ? 'Link Copied' : 'Details'}</span>
                     </button>
-                    {isHost && pendingRequests.length > 0 && (
-                        <button
-                            onClick={() => { setSidebarTab('lobby'); setShowSidebar(true); }}
-                            className="relative p-2 bg-accent/20 border border-accent/40 rounded-lg text-accent hover:bg-accent/30 transition-all ml-2"
-                        >
-                            <Users size={18} />
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent-danger text-[10px] font-bold text-white shadow-lg">
-                                {pendingRequests.length}
-                            </span>
-                        </button>
+                    {isHost && (
+                        <div className="ml-2">
+                            <HostControlsPanel
+                                participants={peers.map((p) => ({
+                                    socketId: p.socketId,
+                                    userName: p.userName,
+                                    role: 'participant' as const,
+                                }))}
+                                isLocked={isLocked}
+                                onAction={hostAction}
+                            />
+                        </div>
                     )}
                 </div>
             </header>
@@ -441,20 +515,34 @@ export default function MeetingRoomPage() {
                             isScreenShare={isScreenSharing}
                             isMirrored={isMirrored}
                             isActiveSpeaker={activeSpeakerId === 'local'}
+                            onContextMenu={() => openParticipantModal({ socketId: 'local', userName: user?.name || 'You', isMicOn, isCamOn })}
                         />
 
                         {/* Remote Videos */}
-                        {peers.map((p) => (
-                            <VideoTile
-                                key={p.socketId}
-                                stream={p.stream}
-                                userName={p.userName}
-                                isMicOn={peerMediaStates[p.socketId]?.mic ?? true}
-                                isCamOn={peerMediaStates[p.socketId]?.camera ?? true}
-                                isScreenShare={peerMediaStates[p.socketId]?.screen ?? false}
-                                isActiveSpeaker={activeSpeakerId === p.socketId}
-                            />
-                        ))}
+                        {peers
+                            .sort((a, b) => {
+                                if (a.socketId === pinnedPeerId) return -1;
+                                if (b.socketId === pinnedPeerId) return 1;
+                                return 0;
+                            })
+                            .map((p) => (
+                                <VideoTile
+                                    key={p.socketId}
+                                    stream={p.stream}
+                                    userName={p.userName}
+                                    isMicOn={peerMediaStates[p.socketId]?.mic ?? true}
+                                    isCamOn={peerMediaStates[p.socketId]?.camera ?? true}
+                                    isScreenShare={peerMediaStates[p.socketId]?.screen ?? false}
+                                    isActiveSpeaker={activeSpeakerId === p.socketId}
+                                    isPinned={pinnedPeerId === p.socketId}
+                                    onClick={() => openParticipantModal({
+                                        socketId: p.socketId,
+                                        userName: p.userName,
+                                        isMicOn: peerMediaStates[p.socketId]?.mic ?? true,
+                                        isCamOn: peerMediaStates[p.socketId]?.camera ?? true
+                                    })}
+                                />
+                            ))}
                     </div>
                 </div>
 
@@ -574,13 +662,19 @@ export default function MeetingRoomPage() {
                 isCamOn={isCamOn}
                 isScreenSharing={isScreenSharing}
                 handRaised={handRaised}
-                showSidebar={showSidebar}
+                showSidebar={sidebarTab !== null}
+                isHost={isHost}
+                isRecording={isRecording}
                 onToggleMic={toggleMic}
                 onToggleCam={toggleCam}
                 onToggleScreenShare={isScreenSharing ? stopScreenShare : startScreenShare}
                 onToggleHand={toggleHand}
-                onToggleSidebar={() => setShowSidebar(!showSidebar)}
+                onToggleSidebar={onToggleSidebar}
                 onOpenSettings={() => setShowSettings(true)}
+                onToggleRecording={handleToggleRecording}
+                isPaused={isPaused}
+                onPauseRecording={pauseRecording}
+                onResumeRecording={resumeRecording}
                 onLeave={handleLeave}
             />
 
@@ -610,20 +704,13 @@ export default function MeetingRoomPage() {
                 </div>
             )}
 
-            {/* ── HOST CONTROLS (overlay bottom right) ── */}
-            {isHost && (
-                <div className="fixed bottom-24 right-6 z-20">
-                    <HostControlsPanel
-                        participants={peers.map((p) => ({
-                            socketId: p.socketId,
-                            userName: p.userName,
-                            role: 'participant' as const,
-                        }))}
-                        isLocked={isLocked}
-                        onAction={hostAction}
-                    />
-                </div>
-            )}
+            {/* Participant Control Modal */}
+            <ParticipantControlModal
+                isOpen={isParticipantModalOpen}
+                onClose={() => setIsParticipantModalOpen(false)}
+                participant={selectedParticipant}
+                onAction={handleParticipantAction}
+            />
         </div>
     );
 }

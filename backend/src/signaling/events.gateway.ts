@@ -22,6 +22,7 @@ import type {
     DenyRequestPayload,
     BulkApprovePayload,
     HostActionPayload,
+    ParticipantActionPayload,
     RaiseHandPayload,
 } from './lobby.types';
 import {
@@ -734,6 +735,39 @@ export class EventsGateway
                     action: 'mute-all',
                     actorSocketId: client.id,
                 });
+                // Emit to others only
+                client.to(data.roomId).emit('force-mute');
+                break;
+            }
+
+            case 'mute-participant': {
+                if (!data.targetSocketId) return;
+                const targetSocket = this.server.sockets.sockets.get(data.targetSocketId);
+                if (targetSocket) {
+                    targetSocket.emit('force-mute');
+                    this.logDebug('force-mute sent to participant', { target: data.targetSocketId });
+                }
+                break;
+            }
+
+            case 'disable-camera': {
+                if (!data.targetSocketId) return;
+                const targetSocket = this.server.sockets.sockets.get(data.targetSocketId);
+                if (targetSocket) {
+                    targetSocket.emit('force-disable-cam');
+                    this.logDebug('force-disable-cam sent to participant', { target: data.targetSocketId });
+                }
+                break;
+            }
+
+            case 'toggle-lobby': {
+                const currentSettings = this.roomSettings.get(data.roomId);
+                if (currentSettings) {
+                    currentSettings.lobbyEnabled = !currentSettings.lobbyEnabled;
+                    this.server.to(data.roomId).emit('lobby-setting-changed', {
+                        enabled: currentSettings.lobbyEnabled,
+                    });
+                }
                 break;
             }
 
@@ -790,6 +824,22 @@ export class EventsGateway
                 break;
             }
 
+            case 'recording-start': {
+                this.server.to(data.roomId).emit('recording-state-changed', {
+                    isRecording: true,
+                    startedBy: client.id,
+                });
+                break;
+            }
+
+            case 'recording-stop': {
+                this.server.to(data.roomId).emit('recording-state-changed', {
+                    isRecording: false,
+                    stoppedBy: client.id,
+                });
+                break;
+            }
+
             case 'end-meeting': {
                 this.server.to(data.roomId).emit('host-action-applied', {
                     action: 'end-meeting',
@@ -825,6 +875,32 @@ export class EventsGateway
             targetSocketId: data.targetSocketId,
             roomId: data.roomId,
         });
+    }
+
+    @SubscribeMessage('participant-action')
+    handleParticipantAction(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: ParticipantActionPayload,
+    ) {
+        if (!data?.roomId || !data?.action || !data?.targetUserId) return;
+        if (!this.isHostOrCoHost(client.id, data.roomId)) return;
+
+        const targetSocket = this.server.sockets.sockets.get(data.targetUserId);
+        if (targetSocket) {
+            targetSocket.emit('participant-action', {
+                action: data.action,
+            });
+
+            // If remove, actually kick them from the gateway rooms
+            if (data.action === 'remove') {
+                this.removeParticipant(targetSocket, 'leave-room');
+            }
+
+            this.logDebug('participant-action sent', {
+                action: data.action,
+                target: data.targetUserId,
+            });
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -887,6 +963,18 @@ export class EventsGateway
 
         this.server.to(data.targetSocketId).emit('ice-candidate', {
             candidate: data.candidate,
+            fromSocketId: client.id,
+        });
+    }
+
+    @SubscribeMessage('renegotiate-request')
+    handleRenegotiateRequest(
+        @ConnectedSocket() client: Socket,
+        @MessageBody() data: TargetPayload,
+    ) {
+        if (!this.isValidTarget(client.id, data.targetSocketId, 'renegotiate-request')) return;
+
+        this.server.to(data.targetSocketId).emit('renegotiate-request', {
             fromSocketId: client.id,
         });
     }
