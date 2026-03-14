@@ -65,23 +65,44 @@ interface UseWebRTCProps {
     userName: string;
 }
 
-// ── HELPER: PLACEHOLDER TRACKS ───────────────────────────────────────────────
-function createBlackVideoTrack(): MediaStreamTrack {
-    const canvas = document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const stream = (canvas as any).captureStream(1);
-    return stream.getVideoTracks()[0];
+// ── HELPER: PLACEHOLDER TRACKS (SINGLETONS) ──────────────────────────────────
+const PLACEHOLDER_RESOURCES = {
+    audioContext: null as AudioContext | null,
+    canvas: null as HTMLCanvasElement | null,
+    silentTrack: null as MediaStreamTrack | null,
+    blackTrack: null as MediaStreamTrack | null,
+};
+
+function getSilentAudioTrack(): MediaStreamTrack {
+    if (PLACEHOLDER_RESOURCES.silentTrack && PLACEHOLDER_RESOURCES.silentTrack.readyState === 'live') {
+        return PLACEHOLDER_RESOURCES.silentTrack;
+    }
+    if (!PLACEHOLDER_RESOURCES.audioContext) {
+        PLACEHOLDER_RESOURCES.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const dst = PLACEHOLDER_RESOURCES.audioContext.createMediaStreamDestination();
+    const track = dst.stream.getAudioTracks()[0];
+    PLACEHOLDER_RESOURCES.silentTrack = track;
+    return track;
 }
 
-function createSilentAudioTrack(): MediaStreamTrack {
-    const ctx = new AudioContext();
-    const dst = ctx.createMediaStreamDestination();
-    ctx.createOscillator().connect(dst);
-    return dst.stream.getAudioTracks()[0];
+function getBlackVideoTrack(): MediaStreamTrack {
+    if (PLACEHOLDER_RESOURCES.blackTrack && PLACEHOLDER_RESOURCES.blackTrack.readyState === 'live') {
+        return PLACEHOLDER_RESOURCES.blackTrack;
+    }
+    if (!PLACEHOLDER_RESOURCES.canvas) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 120;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        PLACEHOLDER_RESOURCES.canvas = canvas;
+    }
+    const stream = (PLACEHOLDER_RESOURCES.canvas as any).captureStream(1);
+    const track = stream.getVideoTracks()[0];
+    PLACEHOLDER_RESOURCES.blackTrack = track;
+    return track;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -236,7 +257,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         createPeerConnection(remotePeer);
     }, [createPeerConnection]);
 
-    const joinRoom = useCallback(async () => {
+    const joinRoom = useCallback(async (initialMedia?: { camera: boolean; mic: boolean }) => {
         if (hasJoined.current) return;
         hasJoined.current = true;
 
@@ -245,14 +266,23 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             const stream = new MediaStream();
             let userStream: MediaStream | null = null;
 
-            if (isMicOn || isCamOn) {
+            const targetMic = initialMedia?.mic ?? isMicOn;
+            const targetCam = initialMedia?.camera ?? isCamOn;
+
+            if (targetMic || targetCam) {
                 try {
                     userStream = await navigator.mediaDevices.getUserMedia({
-                        audio: isMicOn,
-                        video: isCamOn
+                        audio: targetMic,
+                        video: targetCam
                     });
-                    if (isMicOn) isRealAudio.current = true;
-                    if (isCamOn) isRealVideo.current = true;
+                    if (targetMic) {
+                        isRealAudio.current = true;
+                        setIsMicOn(true);
+                    }
+                    if (targetCam) {
+                        isRealVideo.current = true;
+                        setIsCamOn(true);
+                    }
                 } catch (err) {
                     console.warn('[WebRTC] Pre-join media acquisition failed. Using placeholders.', err);
                 }
@@ -260,10 +290,10 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
 
             const aTrack = (userStream && userStream.getAudioTracks().length > 0)
                 ? userStream.getAudioTracks()[0]
-                : createSilentAudioTrack();
+                : getSilentAudioTrack();
             const vTrack = (userStream && userStream.getVideoTracks().length > 0)
                 ? userStream.getVideoTracks()[0]
-                : createBlackVideoTrack();
+                : getBlackVideoTrack();
 
             aTrack.enabled = true;
             vTrack.enabled = true;
@@ -277,7 +307,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             socket?.emit('join-room', {
                 roomId,
                 userName,
-                mediaState: { camera: isCamOn, mic: isMicOn, screen: false },
+                mediaState: { camera: targetCam, mic: targetMic, screen: false },
             });
 
         } catch (err) {
@@ -431,6 +461,14 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             }
         });
 
+        socket.on('force-mute', () => {
+            handleMicOffRef.current();
+        });
+
+        socket.on('force-disable-cam', () => {
+            handleCamOffRef.current();
+        });
+
         return () => {
             socket.off('room-state');
             socket.off('user-joined');
@@ -498,7 +536,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const handleMicOff = useCallback(() => {
         if (!localStreamRef.current) return;
         localStreamRef.current.getAudioTracks().forEach((t) => t.stop());
-        const silentTrack = createSilentAudioTrack();
+        const silentTrack = getSilentAudioTrack();
         void replaceTrackInPeers('audio', silentTrack);
         updateLocalStreamTracks('audio', silentTrack);
         isRealAudio.current = false;
@@ -509,7 +547,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const handleCamOff = useCallback(() => {
         if (!localStreamRef.current) return;
         localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
-        const blackTrack = createBlackVideoTrack();
+        const blackTrack = getBlackVideoTrack();
         void replaceTrackInPeers('video', blackTrack);
         updateLocalStreamTracks('video', blackTrack);
         isRealVideo.current = false;
@@ -603,7 +641,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 track = stream.getVideoTracks()[0];
             } else {
-                track = createBlackVideoTrack();
+                track = getBlackVideoTrack();
             }
             await replaceTrackInPeers('video', track);
             updateLocalStreamTracks('video', track);

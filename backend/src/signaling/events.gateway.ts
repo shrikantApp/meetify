@@ -729,14 +729,15 @@ export class EventsGateway
                 for (const [sid, pInfo] of Object.entries(room.participants)) {
                     if (sid !== settings.hostSocketId && !settings.coHostSocketIds.has(sid)) {
                         pInfo.mediaState.mic = false;
+                        // Emit to individual sockets to trigger local track stops
+                        const targetSocket = this.server.sockets.sockets.get(sid);
+                        if (targetSocket) targetSocket.emit('force-mute');
                     }
                 }
                 this.server.to(data.roomId).emit('host-action-applied', {
                     action: 'mute-all',
                     actorSocketId: client.id,
                 });
-                // Emit to others only
-                client.to(data.roomId).emit('force-mute');
                 break;
             }
 
@@ -745,6 +746,9 @@ export class EventsGateway
                 const targetSocket = this.server.sockets.sockets.get(data.targetSocketId);
                 if (targetSocket) {
                     targetSocket.emit('force-mute');
+                    // Update internal state
+                    const pInfo = room.participants[data.targetSocketId];
+                    if (pInfo) pInfo.mediaState.mic = false;
                     this.logDebug('force-mute sent to participant', { target: data.targetSocketId });
                 }
                 break;
@@ -755,6 +759,9 @@ export class EventsGateway
                 const targetSocket = this.server.sockets.sockets.get(data.targetSocketId);
                 if (targetSocket) {
                     targetSocket.emit('force-disable-cam');
+                    // Update internal state
+                    const pInfo = room.participants[data.targetSocketId];
+                    if (pInfo) pInfo.mediaState.camera = false;
                     this.logDebug('force-disable-cam sent to participant', { target: data.targetSocketId });
                 }
                 break;
@@ -887,16 +894,24 @@ export class EventsGateway
 
         const targetSocket = this.server.sockets.sockets.get(data.targetUserId);
         if (targetSocket) {
-            targetSocket.emit('participant-action', {
+            let eventName = 'participant-action';
+            let action = data.action;
+
+            if (data.action === 'mute') eventName = 'force-mute';
+            if (data.action === 'stop-video') eventName = 'force-disable-cam';
+
+            targetSocket.emit(eventName, {
                 action: data.action,
             });
 
             // If remove, actually kick them from the gateway rooms
             if (data.action === 'remove') {
+                targetSocket.emit('host-action-applied', { action: 'removed' });
                 this.removeParticipant(targetSocket, 'leave-room');
             }
 
             this.logDebug('participant-action sent', {
+                eventName,
                 action: data.action,
                 target: data.targetUserId,
             });

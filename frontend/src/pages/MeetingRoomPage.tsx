@@ -202,21 +202,22 @@ export default function MeetingRoomPage() {
     const [handRaised, setHandRaised] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
 
-    // Active speaker logic: priority to screen sharer, then first peer with mic on, then local
+    // Active speaker logic: priority to screen sharer, then current talker (mic on), then local if talking
     useEffect(() => {
         const screenSharer = peers.find((p: any) => peerMediaStates[p.socketId]?.screen);
         if (screenSharer) {
             setActiveSpeakerId(screenSharer.socketId);
         } else {
-            const speaker = peers.find((p: any) => peerMediaStates[p.socketId]?.mic);
-            if (speaker) {
-                setActiveSpeakerId(speaker.socketId);
-            } else if (isMicOn || isCamOn || isScreenSharing) {
+            // Priority: Peer with mic on > Local with mic on > First Peer > Local
+            const peerSpeaker = peers.find((p: any) => peerMediaStates[p.socketId]?.mic);
+            if (peerSpeaker) {
+                setActiveSpeakerId(peerSpeaker.socketId);
+            } else if (isMicOn) {
                 setActiveSpeakerId('local');
             } else if (peers.length > 0) {
                 setActiveSpeakerId(peers[0].socketId);
             } else {
-                setActiveSpeakerId(null);
+                setActiveSpeakerId('local');
             }
         }
     }, [peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing]);
@@ -230,7 +231,10 @@ export default function MeetingRoomPage() {
             configureRoom(meeting.lobbyEnabled);
         }
 
-        joinRoom();
+        joinRoom({
+            camera: isCamOn,
+            mic: isMicOn
+        });
     }, [socket, meeting, isHost, joinRoom, configureRoom]);
 
     // Chat messages from socket
@@ -548,22 +552,22 @@ export default function MeetingRoomPage() {
                                 return 0;
                             })
                             .map((p) => (
-                                <VideoTile
-                                    key={p.socketId}
-                                    stream={p.stream}
-                                    userName={p.userName}
-                                    isMicOn={peerMediaStates[p.socketId]?.mic ?? true}
-                                    isCamOn={peerMediaStates[p.socketId]?.camera ?? true}
-                                    isScreenShare={peerMediaStates[p.socketId]?.screen ?? false}
-                                    isActiveSpeaker={activeSpeakerId === p.socketId}
-                                    isPinned={pinnedPeerId === p.socketId}
-                                    onClick={() => openParticipantModal({
-                                        socketId: p.socketId,
-                                        userName: p.userName,
-                                        isMicOn: peerMediaStates[p.socketId]?.mic ?? true,
-                                        isCamOn: peerMediaStates[p.socketId]?.camera ?? true
-                                    })}
-                                />
+                                    <VideoTile
+                                        key={p.socketId}
+                                        stream={p.stream}
+                                        userName={p.userName}
+                                        isMicOn={peerMediaStates[p.socketId]?.mic ?? false}
+                                        isCamOn={peerMediaStates[p.socketId]?.camera ?? false}
+                                        isScreenShare={peerMediaStates[p.socketId]?.screen ?? false}
+                                        isActiveSpeaker={activeSpeakerId === p.socketId}
+                                        isPinned={pinnedPeerId === p.socketId}
+                                        onClick={() => openParticipantModal({
+                                            socketId: p.socketId,
+                                            userName: p.userName,
+                                            isMicOn: peerMediaStates[p.socketId]?.mic ?? false,
+                                            isCamOn: peerMediaStates[p.socketId]?.camera ?? false
+                                        })}
+                                    />
                             ))}
                     </div>
                 </div>

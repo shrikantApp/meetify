@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Meeting } from '../../meetings/entities/meeting.entity';
 import { MeetingParticipant } from '../../meetings/entities/meeting-participant.entity';
+import { MeetingRecording } from '../../meetings/entities/meeting-recording.entity';
 
 @Entity('users')
 export class User {
@@ -34,4 +35,7 @@ export class User {
 
   @OneToMany(() => MeetingParticipant, (participant) => participant.user)
   meetingParticipations: MeetingParticipant[];
+
+  @OneToMany(() => MeetingRecording, (recording) => recording.host)
+  recordings: MeetingRecording[];
 }

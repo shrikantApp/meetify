@@ -19,6 +19,9 @@ export default function RemoteVideo({ stream, className = "", isScreenShare }: R
         if (videoRef.current && stream) {
             console.log(`[WebRTC] RemoteVideo updating srcObject for ${isScreenShare ? 'ScreenShare' : 'Camera'}`);
             videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(err => {
+                console.warn('[WebRTC] RemoteVideo autoplay failed:', err);
+            });
         }
     }, [stream, isScreenShare]);
 

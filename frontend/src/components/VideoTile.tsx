@@ -40,22 +40,27 @@ export default function VideoTile({
                     onContextMenu();
                 }
             }}
-            className={`relative w-full h-full bg-bg-card border-2 rounded-2xl overflow-hidden transition-all duration-500 shadow-2xl group cursor-pointer ${isActiveSpeaker ? 'border-accent shadow-accent/20 scale-[1.01] z-10' : isPinned ? 'border-accent shadow-accent/20' : 'border-white/5'} ${className}`}
+            className={`participant-video relative w-full h-full bg-bg-card border-2 rounded-2xl overflow-hidden transition-all duration-500 shadow-2xl group cursor-pointer ${isActiveSpeaker ? 'border-accent shadow-accent/20 scale-[1.01] z-10' : isPinned ? 'border-accent shadow-accent/20' : 'border-white/5'} ${className}`}
+            data-username={userName}
+            data-iscamon={isCamOn}
+            data-ismicon={isMicOn}
+            data-islocal={isLocal}
+            data-ismirrored={isMirrored}
         >
             {/* Video Element - Modularized */}
-            {(isCamOn || isScreenShare) && stream && (
+            {stream && (
                 isLocal ? (
                     <LocalVideo
                         stream={stream}
                         isMirrored={isMirrored}
                         isScreenShare={isScreenShare}
-                        className={(isCamOn || isScreenShare) ? 'opacity-100' : 'opacity-0 absolute'}
+                        className={(isCamOn || isScreenShare) ? 'opacity-100 w-full h-full object-cover' : 'opacity-[0.01] absolute w-1 h-1 pointer-events-none'}
                     />
                 ) : (
                     <RemoteVideo
                         stream={stream}
                         isScreenShare={isScreenShare}
-                        className={(isCamOn || isScreenShare) ? 'opacity-100' : 'opacity-0 absolute'}
+                        className={(isCamOn || isScreenShare) ? 'opacity-100 w-full h-full object-cover' : 'opacity-[0.01] absolute w-1 h-1 pointer-events-none'}
                     />
                 )
             )}

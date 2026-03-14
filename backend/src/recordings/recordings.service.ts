@@ -34,8 +34,8 @@ export class RecordingsService {
             fs.writeFileSync(absolutePath, file.buffer);
 
             const recording = this.recordingsRepository.create({
-                meetingId,
-                hostId,
+                meeting: { id: meetingId },
+                host: { id: hostId },
                 filePath,
                 fileSize: file.size,
                 duration: Math.round(duration),
@@ -52,7 +52,7 @@ export class RecordingsService {
 
     async getRecordingsByMeeting(meetingId: string) {
         return this.recordingsRepository.find({
-            where: { meetingId },
+            where: { meeting: { id: meetingId } },
             order: { createdAt: 'DESC' },
         });
     }
