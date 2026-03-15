@@ -13,9 +13,17 @@ interface UseRecordingProps {
     isMicOn: boolean;
     isCamOn: boolean;
     isScreenSharing: boolean;
+    layoutMode: 'grid' | 'spotlight';
+    spotlightId: string | null;
+    localCameraStream?: MediaStream | null; // For local PiP
+    activeSpeakerId?: string | null;
 }
 
-export function useRecording({ socket, meetingCode, meetingId, meetingTitle, hostId, localStream, peers, isMicOn, isCamOn, isScreenSharing }: UseRecordingProps) {
+export function useRecording({
+    socket, meetingCode, meetingId, meetingTitle, hostId,
+    localStream, peers, isMicOn, isCamOn, isScreenSharing,
+    layoutMode, spotlightId, localCameraStream, activeSpeakerId
+}: UseRecordingProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
@@ -67,6 +75,132 @@ export function useRecording({ socket, meetingCode, meetingId, meetingTitle, hos
         };
     }, []);
 
+    const drawTile = (
+        ctx: CanvasRenderingContext2D,
+        tile: HTMLElement,
+        rx: number,
+        ry: number,
+        rw: number,
+        rh: number
+    ) => {
+        // Border matching UI (bg-card border-white/5 or active speaker accent border)
+        ctx.fillStyle = '#1a1e35'; // bg-card
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, rw, rh, 16);
+        ctx.fill();
+
+        ctx.strokeStyle = '#6c63ff'; // accent color thin border representation
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, rw, rh, 16);
+        ctx.clip();
+
+        // Draw Inner Box
+        const video = tile.querySelector('video');
+        const isCamOn = tile.getAttribute('data-iscamon') === 'true';
+        const isScreenShare = tile.getAttribute('data-isscreenshare') === 'true';
+        const userName = tile.getAttribute('data-username') || 'Participant';
+        const isLocalTile = tile.getAttribute('data-islocal') === 'true';
+        const isMirrored = tile.getAttribute('data-ismirrored') === 'true';
+
+        if (video && video.readyState >= 2 && (isCamOn || isScreenShare)) {
+            // Draw video
+            const videoRatio = video.videoWidth / video.videoHeight;
+            const cellRatio = rw / rh;
+
+            let drawWidth = rw;
+            let drawHeight = rh;
+            let drawX = rx;
+            let drawY = ry;
+
+            if (videoRatio && cellRatio) {
+                if (isScreenShare) {
+                    // Contain-fit: letterbox the screen share
+                    if (videoRatio > cellRatio) {
+                        drawHeight = rw / videoRatio;
+                        drawY = ry + (rh - drawHeight) / 2;
+                        drawWidth = rw;
+                        drawX = rx;
+                    } else {
+                        drawWidth = rh * videoRatio;
+                        drawX = rx + (rw - drawWidth) / 2;
+                        drawHeight = rh;
+                        drawY = ry;
+                    }
+                } else {
+                    // Object-cover: crop to fill
+                    if (videoRatio > cellRatio) {
+                        drawWidth = rh * videoRatio;
+                        drawX = rx - (drawWidth - rw) / 2;
+                    } else {
+                        drawHeight = rw / videoRatio;
+                        drawY = ry - (drawHeight - rh) / 2;
+                    }
+                }
+            }
+
+            try {
+                ctx.save();
+                if (isMirrored && !isScreenShare) {
+                    ctx.translate(drawX + drawWidth / 2, drawY + drawHeight / 2);
+                    ctx.scale(-1, 1);
+                    ctx.translate(-(drawX + drawWidth / 2), -(drawY + drawHeight / 2));
+                }
+                ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+                ctx.restore();
+            } catch (e) { /* ignore */ }
+        } else {
+            // Placeholder
+            const grad = ctx.createLinearGradient(rx, ry, rx + rw, ry + rh);
+            grad.addColorStop(0, '#13162b');
+            grad.addColorStop(1, '#1a1e35');
+            ctx.fillStyle = grad;
+            ctx.fillRect(rx, ry, rw, rh);
+
+            const cx = rx + rw / 2;
+            const cy = ry + rh / 2;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy - 10, 48, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(108, 99, 255, 0.2)';
+            ctx.fill();
+
+            ctx.fillStyle = '#6c63ff';
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(userName[0]?.toUpperCase() || 'U', cx, cy - 10);
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.roundRect(cx - 50, cy + 60, 100, 24, 12);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText('CAMERA IS OFF', cx, cy + 61);
+        }
+
+        ctx.restore();
+
+        // Draw Name Overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.beginPath();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        const label = `${userName} ${isLocalTile ? '(You)' : ''}`;
+        const labelWidth = ctx.measureText(label).width;
+        ctx.roundRect(rx + 16, ry + rh - 44, labelWidth + 24, 28, 10);
+        ctx.fill();
+
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(label, rx + 28, ry + rh - 30);
+    };
+
     const drawGrid = useCallback(() => {
         if (!hiddenCanvasRef.current || !isRecording || isPaused) return;
 
@@ -74,178 +208,130 @@ export function useRecording({ socket, meetingCode, meetingId, meetingTitle, hos
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Background color (bg-primary)
+        // Background
         ctx.fillStyle = '#0d0f18';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // --- Grid Area ---
         const gridY = 80;
-        const gridHeight = canvas.height - 80 - 120; // Leave space for header and floating controls
-        const gridWidth = canvas.width - 64; // px-8 (32px) on both sides
+        const gridHeight = canvas.height - 80 - 120;
+        const gridWidth = canvas.width - 64;
         const gridStartX = 32;
 
         const tiles = getParticipantTiles();
         const count = tiles.length;
 
-        // Draw the background for video grid area (we just draw tiles)
-        if (count > 0) {
-            let cols = 1;
-            let rows = 1;
+        if (layoutMode === 'grid' || count === 0) {
+            const count = tiles.length;
+            if (count > 0) {
+                let cols = 1;
+                let rows = 1;
+                if (count > 1 && count <= 4) { cols = 2; rows = Math.ceil(count / 2); }
+                else if (count > 4 && count <= 9) { cols = 3; rows = Math.ceil(count / 3); }
+                else if (count > 9) { cols = 4; rows = Math.ceil(count / 4); }
 
-            if (count > 1 && count <= 4) {
-                cols = 2;
-                rows = Math.ceil(count / 2);
-            } else if (count > 4 && count <= 9) {
-                cols = 3;
-                rows = Math.ceil(count / 3);
-            } else if (count > 9) {
-                cols = 4;
-                rows = Math.ceil(count / 4);
+                const cellWidth = gridWidth / cols;
+                const cellHeight = gridHeight / rows;
+
+                tiles.forEach((tile, index) => {
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+                    const rx = gridStartX + (col * cellWidth) + 10;
+                    const ry = gridY + (row * cellHeight) + 10;
+                    const rw = cellWidth - 20;
+                    const rh = cellHeight - 20;
+                    drawTile(ctx, tile, rx, ry, rw, rh);
+                });
+            }
+        } else {
+            // SPOTLIGHT MODE
+            const stripWidth = 240;
+            const spotlightWidth = gridWidth - stripWidth - 20;
+            const spotlightHeight = gridHeight;
+
+            const spotlightTile = tiles.find(t => t.getAttribute('data-isspotlight') === 'true') || tiles[0];
+            const otherTiles = tiles.filter(t => t !== spotlightTile);
+
+            // 1. Draw Spotlight
+            drawTile(ctx, spotlightTile, gridStartX, gridY, spotlightWidth, spotlightHeight);
+
+            // 2. Draw strip
+            if (otherTiles.length > 0) {
+                const stripX = gridStartX + spotlightWidth + 20;
+                // Draw up to 5 visible others in the strip
+                const stripTilesCount = Math.min(otherTiles.length, 5);
+                const stripTileHeight = (gridHeight - (stripTilesCount - 1) * 10) / stripTilesCount;
+
+                otherTiles.slice(0, stripTilesCount).forEach((tile, index) => {
+                    const ry = gridY + index * (stripTileHeight + 10);
+                    drawTile(ctx, tile, stripX, ry, stripWidth, stripTileHeight);
+                });
             }
 
-            const cellWidth = gridWidth / cols;
-            const cellHeight = gridHeight / rows;
+            // 3. PiP Overlay: If spotlight is a screen share, check if sharer has a camera tile
+            const isSpotlightScreen = spotlightTile.getAttribute('data-isscreenshare') === 'true';
+            if (isSpotlightScreen) {
+                let userName = spotlightTile.getAttribute('data-username') || '';
+                // Strip "'s Screen" for name matching to find the camera tile
+                const matchName = userName.replace("'s Screen", "").trim();
 
-            tiles.forEach((tile, index) => {
-                const col = index % cols;
-                const row = Math.floor(index / cols);
-                const x = gridStartX + (col * cellWidth);
-                const y = gridY + (row * cellHeight);
+                const cameraTile = tiles.find(t => 
+                    (t.getAttribute('data-username') === matchName || t.getAttribute('data-username') === userName) && 
+                    t.getAttribute('data-isscreenshare') !== 'true' &&
+                    t.getAttribute('data-iscamon') === 'true'
+                );
 
-                // Add padding/gap
-                const padding = 10;
-                const rx = x + padding;
-                const ry = y + padding;
-                const rw = cellWidth - padding * 2;
-                const rh = cellHeight - padding * 2;
-
-                // Border matching UI (bg-card border-white/5 or active speaker accent border)
-                ctx.fillStyle = '#1a1e35'; // bg-card
-                ctx.beginPath();
-                ctx.roundRect(rx, ry, rw, rh, 16);
-                ctx.fill();
-
-                ctx.strokeStyle = '#6c63ff'; // accent color thin border representation
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                
-                ctx.save();
-                ctx.beginPath();
-                ctx.roundRect(rx, ry, rw, rh, 16);
-                ctx.clip();
-                
-                // Draw Inner Box
-                const video = tile.querySelector('video');
-                const isCamOn = tile.getAttribute('data-iscamon') === 'true';
-                const isScreenShare = tile.getAttribute('data-isscreenshare') === 'true';
-                const userName = tile.getAttribute('data-username') || 'Participant';
-                const isLocalTile = tile.getAttribute('data-islocal') === 'true';
-                const isMirrored = tile.getAttribute('data-ismirrored') === 'true';
-
-                if (video && video.readyState >= 2 && (isCamOn || isScreenShare)) {
-                    // Draw video
-                    const videoRatio = video.videoWidth / video.videoHeight;
-                    const cellRatio = rw / rh;
+                if (cameraTile) {
+                    const pipWidth = 200;
+                    const pipHeight = (pipWidth * 9) / 16;
+                    const pipX = gridStartX + spotlightWidth - pipWidth - 20;
+                    const pipY = gridY + spotlightHeight - pipHeight - 20;
                     
-                    let drawWidth = rw;
-                    let drawHeight = rh;
-                    let drawX = rx;
-                    let drawY = ry;
-
-                    if (videoRatio && cellRatio) {
-                        if (isScreenShare) {
-                            // Contain-fit: letterbox the screen share so all content is visible
-                            if (videoRatio > cellRatio) {
-                                drawHeight = rw / videoRatio;
-                                drawY = ry + (rh - drawHeight) / 2;
-                                drawWidth = rw;
-                                drawX = rx;
-                            } else {
-                                drawWidth = rh * videoRatio;
-                                drawX = rx + (rw - drawWidth) / 2;
-                                drawHeight = rh;
-                                drawY = ry;
-                            }
+                    ctx.save();
+                    // Draw PiP border/shadow
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = 20;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 10;
+                    
+                    ctx.fillStyle = '#0d0f18';
+                    ctx.beginPath();
+                    ctx.roundRect(pipX, pipY, pipWidth, pipHeight, 16);
+                    ctx.fill();
+                    
+                    ctx.save();
+                    ctx.clip();
+                    
+                    const video = cameraTile.querySelector('video');
+                    if (video && video.readyState >= 2) {
+                        // Fit cover
+                        const videoRatio = video.videoWidth / video.videoHeight;
+                        const pipRatio = pipWidth / pipHeight;
+                        let dw = pipWidth, dh = pipHeight, dx = pipX, dy = pipY;
+                        
+                        if (videoRatio > pipRatio) {
+                            dw = pipHeight * videoRatio;
+                            dx = pipX - (dw - pipWidth) / 2;
                         } else {
-                            // Object-cover: crop to fill for camera tiles
-                            if (videoRatio > cellRatio) {
-                                drawWidth = rh * videoRatio;
-                                drawX = rx - (drawWidth - rw) / 2;
-                            } else {
-                                drawHeight = rw / videoRatio;
-                                drawY = ry - (drawHeight - rh) / 2;
-                            }
+                            dh = pipWidth / videoRatio;
+                            dy = pipY - (dh - pipHeight) / 2;
                         }
+
+                        const isMirrored = cameraTile.getAttribute('data-ismirrored') === 'true';
+                        if (isMirrored) {
+                            ctx.translate(dx + dw / 2, dy + dh / 2);
+                            ctx.scale(-1, 1);
+                            ctx.translate(-(dx + dw / 2), -(dy + dh / 2));
+                        }
+                        ctx.drawImage(video, dx, dy, dw, dh);
                     }
-
-                    try {
-                         ctx.save();
-                         // Apply flip transform only for local webcam, never for screen shares
-                         if (isMirrored && !isScreenShare) {
-                             ctx.translate(drawX + drawWidth / 2, drawY + drawHeight / 2);
-                             ctx.scale(-1, 1);
-                             ctx.translate(-(drawX + drawWidth / 2), -(drawY + drawHeight / 2));
-                         }
-                         ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
-                         ctx.restore();
-                    } catch(e) { /* ignore */ }
-                } else {
-                    // Draw Placeholder Avatar
-                    // Background is already bg-card. Let's add slight gradient mock
-                    const grad = ctx.createLinearGradient(rx, ry, rx+rw, ry+rh);
-                    grad.addColorStop(0, '#13162b'); // bg-secondary
-                    grad.addColorStop(1, '#1a1e35'); // bg-card
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(rx, ry, rw, rh);
+                    ctx.restore();
                     
-                    const cx = rx + rw / 2;
-                    const cy = ry + rh / 2; // Center Vertically
-
-                    ctx.beginPath();
-                    ctx.arc(cx, cy - 10, 48, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(108, 99, 255, 0.2)'; // accent/20
-                    ctx.fill();
-                    
-                    ctx.fillStyle = '#6c63ff'; // accent
-                    ctx.font = 'bold 36px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(userName[0]?.toUpperCase() || 'U', cx, cy - 10);
-                    
-                    // CAMERA IS OFF badge
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                    ctx.beginPath();
-                    ctx.roundRect(cx - 50, cy + 60, 100, 24, 12);
-                    ctx.fill();
-                    
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = 'rgba(108, 99, 255, 0.4)';
+                    ctx.lineWidth = 2;
                     ctx.stroke();
-
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // text-white/60
-                    ctx.font = 'bold 10px Arial';
-                    ctx.fillText('CAMERA IS OFF', cx, cy + 61); 
+                    ctx.restore();
                 }
-                
-                ctx.restore();
-
-                // Draw Name Overlay Bottom Left
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; // black/40
-                ctx.beginPath();
-                
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'middle';
-                const label = `${userName} ${isLocalTile ? '(You)' : ''}`;
-                ctx.roundRect(rx + 16, ry + rh - 44, ctx.measureText(label).width + 24, 28, 10);
-                ctx.fill();
-                
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                ctx.stroke();
-
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px Arial';
-                ctx.fillText(label, rx + 28, ry + rh - 30);
-            });
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -587,7 +673,7 @@ export function useRecording({ socket, meetingCode, meetingId, meetingTitle, hos
         ctx.lineTo(bx + 7, btnCenterY + 6);
         ctx.stroke();
 
-    }, [isRecording, isPaused, isMicOn, isCamOn, isScreenSharing, meetingTitle, meetingCode, peers]);
+    }, [isRecording, isPaused, isMicOn, isCamOn, isScreenSharing, meetingTitle, meetingCode, peers, layoutMode, spotlightId, localCameraStream, activeSpeakerId]);
 
     // Start drawing loop when recording starts
     useEffect(() => {

@@ -28,7 +28,7 @@ export default function LocalVideo({ stream, className = "", isMirrored = true, 
             autoPlay
             playsInline
             muted
-            className={`localVideo ${isMirrored ? 'mirrored' : ''} ${className}`}
+            className={`localVideo ${isMirrored ? 'mirrored' : ''} ${isScreenShare ? 'screenShare' : ''} ${className}`}
         />
     );
 }

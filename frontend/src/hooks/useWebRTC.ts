@@ -56,7 +56,10 @@ export interface RemotePeer {
     socketId: string;
     userId: string;
     userName: string;
-    stream?: MediaStream;
+    stream?: MediaStream; // This will hold the camera stream
+    screenStream?: MediaStream; // This will hold the screen sharing stream
+    streamId?: string; // Stable ID for camera stream
+    screenStreamId?: string; // Stable ID for screen stream
 }
 
 interface UseWebRTCProps {
@@ -110,6 +113,7 @@ function getBlackVideoTrack(): MediaStreamTrack {
 // ══════════════════════════════════════════════════════════════════════════════
 export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [localCameraStream, setLocalCameraStream] = useState<MediaStream | null>(null);
     const [peers, setPeers] = useState<RemotePeer[]>([]);
     const [peerMediaStates, setPeerMediaStates] = useState<Record<string, PeerMediaState>>({});
 
@@ -127,12 +131,20 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     // Core WebRTC refs
     const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
     const localStreamRef = useRef<MediaStream | null>(null);
+    const localScreenStreamRef = useRef<MediaStream | null>(null);
     const hasJoined = useRef(false);
+    const peersRef = useRef<RemotePeer[]>([]);
+
+    // Track senders to remove them precisely
+    const cameraSenders = useRef<Map<string, RTCRtpSender>>(new Map());
+    const screenSenders = useRef<Map<string, RTCRtpSender>>(new Map());
+    const audioSenders = useRef<Map<string, RTCRtpSender>>(new Map());
 
     // Negotiation state tracking (perfect negotiation pattern)
     const pendingCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
     const makingOffer = useRef<Map<string, boolean>>(new Map());
     const ignoreOffer = useRef<Map<string, boolean>>(new Map());
+    const peerMediaStatesRef = useRef<Record<string, PeerMediaState>>({});
     const handleMicOffRef = useRef<() => void>(() => undefined);
     const handleCamOffRef = useRef<() => void>(() => undefined);
 
@@ -144,6 +156,15 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         if (!socket) return;
         socket.emit('media-state-change', { roomId, type, enabled });
     }, [socket, roomId]);
+
+    // Keep refs in sync
+    useEffect(() => {
+        peerMediaStatesRef.current = peerMediaStates;
+    }, [peerMediaStates]);
+
+    useEffect(() => {
+        peersRef.current = peers;
+    }, [peers]);
 
     // ── RENEGOTIATION (OFFER CREATION) ───────────────────────────────────────
     const flushPendingCandidates = useCallback(async (socketId: string, pc: RTCPeerConnection) => {
@@ -204,21 +225,67 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         }
 
         pc.ontrack = (event) => {
-            debugLog(`[WebRTC] ontrack from ${remotePeer.socketId}: kind=${event.track.kind}`);
-            setPeers((prev) => prev.map((p) => {
-                if (p.socketId === remotePeer.socketId) {
-                    const currentStream = p.stream || new MediaStream();
-                    currentStream.getTracks()
-                        .filter(t => t.kind === event.track.kind && t.id !== event.track.id)
-                        .forEach(t => currentStream.removeTrack(t));
-
-                    if (!currentStream.getTracks().includes(event.track)) {
-                        currentStream.addTrack(event.track);
+            const track = event.track;
+            const stream = event.streams[0];
+            debugLog(`[WebRTC] ontrack from ${remotePeer.socketId}: kind=${track.kind}, id=${track.id}, streamId=${stream?.id}`);
+            
+            setPeers((prev) => {
+                // Find latest peer state in the update cycle
+                const p = prev.find(peer => peer.socketId === remotePeer.socketId);
+                if (!p) return prev;
+                
+                const isExplicitScreen = (stream?.id?.toLowerCase().includes('screen') || track.label.toLowerCase().includes('screen'));
+                
+                // Track identification logic:
+                // 1. If we have a stable streamId already, check if this stream matches it.
+                // 2. If it's the FIRST stream and not explicitly screen, it's the camera.
+                // 3. Otherwise, if it's explicitly labeled or different from camera, it's screen.
+                let isScreen = track.kind === 'video' && isExplicitScreen;
+                
+                if (track.kind === 'video' && !isExplicitScreen) {
+                    if (p.streamId) {
+                        isScreen = stream.id !== p.streamId;
+                    } else {
+                        // First video track arrival
+                        isScreen = false;
                     }
-                    return { ...p, stream: new MediaStream(currentStream.getTracks()) };
                 }
-                return p;
-            }));
+
+                // Proactive state sync
+                if (track.kind === 'video' || track.kind === 'audio') {
+                    const mediaType = (isScreen && isExplicitScreen) ? 'screen' : (track.kind === 'video' ? 'camera' : 'mic');
+                    setPeerMediaStates(prevStates => {
+                        const currentState = prevStates[remotePeer.socketId];
+                        if (currentState?.[mediaType]) return prevStates;
+                        if (mediaType === 'screen' && !isExplicitScreen) return prevStates;
+
+                        debugLog(`[WebRTC] Proactively syncing ${mediaType} state for ${remotePeer.socketId}`);
+                        return {
+                            ...prevStates,
+                            [remotePeer.socketId]: {
+                                ...(currentState || { camera: false, mic: false, screen: false }),
+                                [mediaType]: true
+                            }
+                        };
+                    });
+                }
+
+                if (isScreen && track.kind === 'video') {
+                    debugLog(`[WebRTC] Identified SCREEN track from ${remotePeer.socketId}`);
+                    return prev.map(item => item.socketId === remotePeer.socketId 
+                        ? { ...item, screenStream: new MediaStream(stream.getTracks()), screenStreamId: stream.id } 
+                        : item
+                    );
+                }
+                
+                debugLog(`[WebRTC] Identified CAMERA/AUDIO track from ${remotePeer.socketId}`);
+                // Always create a NEW MediaStream object for state to force React update, 
+                // but use the stable streamId for classification.
+                return prev.map(item => item.socketId === remotePeer.socketId 
+                    ? { ...item, stream: new MediaStream(stream.getTracks()), streamId: stream.id } 
+                    : item
+                );
+            });
         };
 
         pc.onicecandidate = (event) => {
@@ -263,7 +330,6 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
 
         try {
             debugLog('[WebRTC] Joining room and acquiring media...');
-            const stream = new MediaStream();
             let userStream: MediaStream | null = null;
 
             const targetMic = initialMedia?.mic ?? isMicOn;
@@ -288,21 +354,32 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 }
             }
 
-            const aTrack = (userStream && userStream.getAudioTracks().length > 0)
+            const peerStream = new MediaStream();
+            // We NO LONGER add placeholder tracks to the stream we send to peers.
+            // Peers will identify camera vs screen by stream ID.
+            if (targetCam && userStream) {
+                const vt = userStream.getVideoTracks()[0];
+                if (vt) peerStream.addTrack(vt);
+            }
+            if (targetMic && userStream) {
+                const at = userStream.getAudioTracks()[0];
+                if (at) peerStream.addTrack(at);
+            }
+
+            localStreamRef.current = peerStream;
+
+            // However, for LOCAL UI preview, we might still want the placeholders
+            const localDisplayStream = new MediaStream();
+            const aDisplayTrack = (userStream && userStream.getAudioTracks().length > 0)
                 ? userStream.getAudioTracks()[0]
                 : getSilentAudioTrack();
-            const vTrack = (userStream && userStream.getVideoTracks().length > 0)
+            const vDisplayTrack = (userStream && userStream.getVideoTracks().length > 0)
                 ? userStream.getVideoTracks()[0]
                 : getBlackVideoTrack();
-
-            aTrack.enabled = true;
-            vTrack.enabled = true;
-
-            stream.addTrack(aTrack);
-            stream.addTrack(vTrack);
-
-            localStreamRef.current = stream;
-            setLocalStream(new MediaStream(stream.getTracks()));
+            
+            localDisplayStream.addTrack(aDisplayTrack);
+            localDisplayStream.addTrack(vDisplayTrack);
+            setLocalStream(localDisplayStream);
 
             socket?.emit('join-room', {
                 roomId,
@@ -329,7 +406,6 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 const state = { ...(p.mediaState || { camera: false, mic: false, screen: false }) };
                 if (p.socketId === screenSharerSocketId) {
                     state.screen = true;
-                    state.camera = false;
                 }
                 newStates[p.socketId] = state;
                 callPeer(p);
@@ -359,6 +435,12 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                     [type]: enabled,
                 },
             }));
+
+            // Sync peers state: if camera is turned off, we might want to proactively clear the stream ref
+            // though keeping it for placeholder logic is often fine, clearing it ensures no "black frame" leaks.
+            if (type === 'camera' && !enabled) {
+                setPeers(prev => prev.map(p => p.socketId === socketId ? { ...p, stream: undefined } : p));
+            }
         };
         socket.on('participant-media-state', handleMediaState);
 
@@ -373,6 +455,15 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                     camera,
                 },
             }));
+
+            // Explicitly clear screen stream if they stopped sharing
+            if (!screen) {
+                setPeers(prev => prev.map(p => p.socketId === socketId ? { ...p, screenStream: undefined } : p));
+            }
+            // If they stopped camera, clear the stream Ref
+            if (!camera) {
+                setPeers(prev => prev.map(p => p.socketId === socketId ? { ...p, stream: undefined } : p));
+            }
         };
         socket.on('participant-screen-state', handleScreenState);
 
@@ -497,27 +588,43 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         return () => { socket.off('connect', handleReconnect); };
     }, [socket, roomId, userName, isCamOn, isMicOn, isScreenSharing]);
 
-    // ── MEDIA TRACK HELPERS ──────────────────────────────────────────────────
-    const replaceTrackInPeers = useCallback(async (kind: 'video' | 'audio', newTrack: MediaStreamTrack) => {
+
+
+    const addTrackToPeers = useCallback(async (track: MediaStreamTrack, type: 'audio' | 'camera' | 'screen') => {
+        // Use consistent stream objects so remote peers identify them correctly by ID
+        const stream = type === 'screen' ? localScreenStreamRef.current : localStreamRef.current;
+        if (!stream) {
+            debugLog(`[WebRTC] addTrackToPeers: Cannot add track, ${type} stream missing`);
+            return;
+        }
+        
         const promises = Array.from(peerConnections.current.entries()).map(async ([socketId, pc]) => {
-            let sender = pc.getSenders().find((s) => s.track?.kind === kind);
-            if (!sender) {
-                const transceiver = pc.getTransceivers().find(t => t.sender.track?.kind === kind);
-                if (transceiver) sender = transceiver.sender;
-            }
-            if (sender) {
-                try {
-                    await sender.replaceTrack(newTrack);
-                    return;
-                } catch (error) {
-                    console.error(`[WebRTC] replaceTrack(${kind}) failed for ${socketId}:`, error);
-                }
-            }
-            if (!localStreamRef.current) return;
-            const oldSender = pc.getSenders().find(s => s.track?.kind === kind);
-            if (oldSender) pc.removeTrack(oldSender);
-            pc.addTrack(newTrack, localStreamRef.current);
+            // Check if already has a sender for this track
+            const senders = pc.getSenders();
+            const existing = senders.find(s => s.track === track);
+            if (existing) return;
+
+            debugLog(`[WebRTC] Adding ${type} track to peer ${socketId}`);
+            const sender = pc.addTrack(track, stream);
+            if (type === 'camera') cameraSenders.current.set(socketId, sender);
+            if (type === 'screen') screenSenders.current.set(socketId, sender);
+            if (type === 'audio') audioSenders.current.set(socketId, sender);
             await triggerRenegotiation(pc, socketId);
+        });
+        await Promise.all(promises);
+    }, [triggerRenegotiation]);
+
+    const removeTrackFromPeers = useCallback(async (type: 'audio' | 'camera' | 'screen') => {
+        const senderMap = type === 'camera' ? cameraSenders.current : 
+                         type === 'screen' ? screenSenders.current : audioSenders.current;
+        
+        const promises = Array.from(peerConnections.current.entries()).map(async ([socketId, pc]) => {
+            const sender = senderMap.get(socketId);
+            if (sender) {
+                pc.removeTrack(sender);
+                senderMap.delete(socketId);
+                await triggerRenegotiation(pc, socketId);
+            }
         });
         await Promise.all(promises);
     }, [triggerRenegotiation]);
@@ -526,7 +633,6 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         if (!localStreamRef.current) return;
         const oldTracks = kind === 'audio' ? localStreamRef.current.getAudioTracks() : localStreamRef.current.getVideoTracks();
         oldTracks.forEach((t) => {
-            t.stop();
             localStreamRef.current!.removeTrack(t);
         });
         localStreamRef.current.addTrack(newTrack);
@@ -535,25 +641,31 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
 
     const handleMicOff = useCallback(() => {
         if (!localStreamRef.current) return;
+        // Strict stop hardware
         localStreamRef.current.getAudioTracks().forEach((t) => t.stop());
+        
+        void removeTrackFromPeers('audio');
+        
         const silentTrack = getSilentAudioTrack();
-        void replaceTrackInPeers('audio', silentTrack);
         updateLocalStreamTracks('audio', silentTrack);
         isRealAudio.current = false;
         setIsMicOn(false);
         emitMediaState('mic', false);
-    }, [emitMediaState, replaceTrackInPeers, updateLocalStreamTracks]);
+    }, [emitMediaState, removeTrackFromPeers, updateLocalStreamTracks]);
 
     const handleCamOff = useCallback(() => {
         if (!localStreamRef.current) return;
+        // Strict stop hardware
         localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
+        
+        void removeTrackFromPeers('camera');
+
         const blackTrack = getBlackVideoTrack();
-        void replaceTrackInPeers('video', blackTrack);
         updateLocalStreamTracks('video', blackTrack);
         isRealVideo.current = false;
         setIsCamOn(false);
         emitMediaState('camera', false);
-    }, [emitMediaState, replaceTrackInPeers, updateLocalStreamTracks]);
+    }, [emitMediaState, removeTrackFromPeers, updateLocalStreamTracks]);
 
     handleMicOffRef.current = handleMicOff;
     handleCamOffRef.current = handleCamOff;
@@ -564,7 +676,10 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: forceState } } });
                 const track = stream.getAudioTracks()[0];
-                await replaceTrackInPeers('audio', track);
+                
+                await removeTrackFromPeers('audio');
+                await addTrackToPeers(track, 'audio');
+
                 updateLocalStreamTracks('audio', track);
                 track.enabled = isMicOn;
                 isRealAudio.current = true;
@@ -580,7 +695,9 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: selectedAudioId ? { deviceId: { exact: selectedAudioId } } : true });
                     const track = stream.getAudioTracks()[0];
-                    await replaceTrackInPeers('audio', track);
+                    
+                    await addTrackToPeers(track, 'audio');
+
                     updateLocalStreamTracks('audio', track);
                     isRealAudio.current = true;
                     setIsMicOn(true);
@@ -596,7 +713,10 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: forceState } } });
                 const track = stream.getVideoTracks()[0];
-                await replaceTrackInPeers('video', track);
+                
+                await removeTrackFromPeers('camera');
+                await addTrackToPeers(track, 'camera');
+
                 updateLocalStreamTracks('video', track);
                 track.enabled = isCamOn;
                 isRealVideo.current = true;
@@ -612,7 +732,9 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ video: selectedVideoId ? { deviceId: { exact: selectedVideoId } } : true });
                     const track = stream.getVideoTracks()[0];
-                    await replaceTrackInPeers('video', track);
+                    
+                    await addTrackToPeers(track, 'camera');
+
                     updateLocalStreamTracks('video', track);
                     isRealVideo.current = true;
                     setIsCamOn(true);
@@ -626,26 +748,31 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         try {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
             const track = screenStream.getVideoTracks()[0];
-            await replaceTrackInPeers('video', track);
-            updateLocalStreamTracks('video', track);
+
+            localScreenStreamRef.current = screenStream;
+            setLocalCameraStream(screenStream); // UI can use this as separate source
+
+            await addTrackToPeers(track, 'screen');
+
             track.onended = () => stopScreenShare();
             setIsScreenSharing(true);
+            emitMediaState('screen', true); 
             socket?.emit('screen-share-start', { roomId });
         } catch (err) { console.error('Screen share error:', err); }
     };
 
     const stopScreenShare = async () => {
         try {
-            let track: MediaStreamTrack;
-            if (isCamOn) {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                track = stream.getVideoTracks()[0];
-            } else {
-                track = getBlackVideoTrack();
+            if (localScreenStreamRef.current) {
+                localScreenStreamRef.current.getTracks().forEach(t => t.stop());
+                localScreenStreamRef.current = null;
+                setLocalCameraStream(null);
             }
-            await replaceTrackInPeers('video', track);
-            updateLocalStreamTracks('video', track);
+
+            await removeTrackFromPeers('screen');
+
             setIsScreenSharing(false);
+            emitMediaState('screen', false);
             socket?.emit('screen-share-stop', { roomId, isCamOn });
         } catch (err) { console.error('Restore camera error:', err); }
     };
@@ -659,7 +786,10 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
         ignoreOffer.current.clear();
         localStreamRef.current?.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
+        localScreenStreamRef.current?.getTracks().forEach(t => t.stop());
+        localScreenStreamRef.current = null;
         setLocalStream(null);
+        setLocalCameraStream(null);
         setPeers([]);
         setPeerMediaStates({});
         hasJoined.current = false;
@@ -686,7 +816,7 @@ export function useWebRTC({ socket, roomId, userName }: UseWebRTCProps) {
     }, [refreshDevices]);
 
     return {
-        localStream, peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing,
+        localStream, localCameraStream, peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing,
         audioDevices, videoDevices, selectedAudioId, selectedVideoId, isMirrored,
         setIsMirrored, joinRoom, leaveRoom, toggleMic, toggleCam,
         startScreenShare, stopScreenShare, refreshDevices,

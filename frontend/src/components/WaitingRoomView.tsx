@@ -87,8 +87,13 @@ export default function WaitingRoomView({
     // ── IDLE / REQUESTING / WAITING STATE ─────────────────────────────────
 
     return (
-        <div className="min-h-screen bg-bg-primary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent/10 via-bg-primary to-bg-primary">
-            <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8 items-center animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="min-h-screen bg-bg-primary flex items-center justify-center p-6 relative overflow-hidden">
+            {/* Mesh Gradient Background Blobs */}
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-accent/10 blur-[150px] rounded-full pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent-success/5 blur-[150px] rounded-full pointer-events-none" />
+
+            <div className="relative z-10 w-full max-w-5xl grid lg:grid-cols-2 gap-12 items-center animate-in fade-in slide-in-from-bottom-12 duration-1000 cubic-bezier(0.16, 1, 0.3, 1)">
+
                 {/* Left side: Preview */}
                 <div className="flex flex-col gap-6">
                     <div className="relative aspect-video rounded-3xl overflow-hidden bg-bg-card border border-white/10 shadow-2xl group">
@@ -133,13 +138,16 @@ export default function WaitingRoomView({
                 </div>
 
                 {/* Right side: Actions */}
-                <div className="bg-bg-card/50 backdrop-blur-2xl p-10 rounded-[2.5rem] border border-white/5 shadow-2xl">
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-white mb-2 leading-tight">
+                <div className="glass-panel p-12 rounded-[3rem] shadow-2xl relative overflow-hidden border-white/10">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 blur-3xl rounded-full" />
+                    
+                    <div className="mb-10 relative z-10">
+                        <h1 className="text-4xl font-extrabold text-white mb-3 leading-tight tracking-tight">
                             {meetingTitle || 'Meeting Room'}
                         </h1>
-                        <p className="text-text-secondary">Ready to join the conversation?</p>
+                        <p className="text-text-secondary text-lg font-medium opacity-80">Ready to join the conversation?</p>
                     </div>
+
 
                     <div className="space-y-6">
                         {lobbyStatus === 'idle' && (
@@ -160,27 +168,28 @@ export default function WaitingRoomView({
                         )}
 
                         {lobbyStatus === 'waiting' && (
-                            <div className="space-y-6 animate-in fade-in zoom-in duration-500">
-                                <div className="flex items-center gap-4 p-4 bg-accent/10 border border-accent/20 rounded-2xl">
-                                    <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-white shadow-lg shadow-accent/40">
-                                        <Clock size={24} className="animate-pulse" />
+                            <div className="space-y-8 animate-in fade-in zoom-in duration-700">
+                                <div className="flex items-center gap-5 p-5 glass-panel !bg-accent/5 border-accent/20 rounded-[2rem]">
+                                    <div className="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center text-white shadow-lg shadow-accent/40">
+                                        <Clock size={28} className="animate-pulse" />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-accent">Waiting for host...</span>
-                                        <span className="text-xs text-text-secondary font-mono">Elapsed: {formatTime(elapsed)}</span>
+                                        <span className="text-base font-black text-accent uppercase tracking-widest">Waiting for host</span>
+                                        <span className="text-xs text-text-secondary font-mono opacity-60">Elapsed: {formatTime(elapsed)}</span>
                                     </div>
                                 </div>
-                                <p className="text-sm text-text-secondary leading-relaxed">
-                                    The meeting host has been notified. They'll let you in any moment now.
+                                <p className="text-sm text-text-secondary leading-relaxed font-medium">
+                                    The meeting host has been notified. Hang tight, they'll let you in any moment now.
                                 </p>
                                 <button
                                     onClick={onCancel}
-                                    className="w-full py-3 text-sm font-bold text-white/40 hover:text-white transition-all underline underline-offset-8"
+                                    className="w-full py-4 text-xs font-black text-white/30 hover:text-white transition-all uppercase tracking-[0.2em] hover:bg-white/5 rounded-2xl border border-transparent hover:border-white/5"
                                 >
                                     Cancel Request
                                 </button>
                             </div>
                         )}
+
 
                         {lobbyStatus === 'denied' && (
                             <div className="space-y-6 animate-in fade-in zoom-in duration-500">

@@ -10,8 +10,15 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 12px;
-  transition: opacity 0.5s ease-in-out, transform 0.5s ease;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-tile {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meeting-layout-container {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mirrored {
@@ -27,24 +34,30 @@
 /* ─── GLOBAL STYLES ─────────────────────────────────────────────────────────── */
 
 :root {
-  --bg-primary: #0d0f18;
-  --bg-secondary: #13162b;
-  --bg-card: #1a1e35;
-  --bg-card-hover: #1f2540;
+  --bg-primary: #0a0b14;
+  --bg-secondary: #121421;
+  --bg-card: rgba(26, 30, 53, 0.65);
+  --bg-card-hover: rgba(31, 37, 64, 0.8);
   --accent: #6c63ff;
   --accent-hover: #7b74ff;
-  --accent-danger: #e05250;
-  --accent-success: #27c274;
-  --text-primary: #f0f2ff;
-  --text-secondary: #8892b0;
-  --border: rgba(108, 99, 255, 0.2);
-  --radius: 12px;
-  --shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+  --accent-danger: #ff5252;
+  --accent-success: #00d26a;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --border: rgba(255, 255, 255, 0.08);
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.1);
 
   /* Dynamic UI Settings */
   --ui-font-size: 14px;
   --ui-icon-size: 20px;
-  --ui-button-size: 42px;
+  --ui-button-size: 44px;
 }
 
 .light-theme {
@@ -61,20 +74,48 @@
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg-primary);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(108, 99, 255, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(108, 99, 255, 0.03) 0px, transparent 50%);
   color: var(--text-primary);
   font-size: var(--ui-font-size);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background 0.3s, color 0.3s;
+  overflow-x: hidden;
 }
 
 a {
   color: var(--accent);
   text-decoration: none;
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 a:hover {
   color: var(--accent-hover);
+}
+
+/* ─── GLASSMORPHISM UTILITIES ────────────────────────────────────────────────── */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 /* ─── UTILITIES ──────────────────────────────────────────────────────────────── */
@@ -1714,19 +1755,11 @@ a:hover {
   }
 }
 
+.custom-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  display: none; /* Chrome, Safari and Opera */
 }

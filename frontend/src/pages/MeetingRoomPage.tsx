@@ -135,7 +135,7 @@ export default function MeetingRoomPage() {
     const [sidebarTab, setSidebarTab] = useState<'participants' | 'chat' | 'lobby' | null>(null);
     const [showSettings, setShowSettings] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [pinnedPeerId, setPinnedPeerId] = useState<string | null>(null);
+    const [manualPinId, setManualPinId] = useState<string | null>(null);
     const [selectedParticipant, setSelectedParticipant] = useState<{
         socketId: string;
         userName: string;
@@ -146,10 +146,81 @@ export default function MeetingRoomPage() {
     const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
 
     const {
-        localStream, peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing,
+        localStream, localCameraStream, peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing,
         audioDevices, videoDevices, selectedAudioId, selectedVideoId, isMirrored, setIsMirrored,
         joinRoom, leaveRoom, toggleMic, toggleCam, startScreenShare, stopScreenShare,
     } = useWebRTC({ socket, roomId: meetingCode || '', userName: user?.name || 'Guest' });
+
+    // ── LAYOUT & PINNING LOGIC ──
+    type TileType = 'camera' | 'screen';
+    interface Tile {
+        id: string; // unique tile id
+        socketId: string; // underlying socket id
+        type: TileType;
+        userName: string;
+        stream?: MediaStream;
+    }
+
+    const tiles = (() => {
+        const result: Tile[] = [];
+        // Local Camera
+        result.push({
+            id: 'local',
+            socketId: 'local',
+            type: 'camera',
+            userName: user?.name || 'You',
+            stream: localStream || undefined
+        });
+        // Local Screen
+        if (isScreenSharing) {
+            result.push({
+                id: 'local-screen',
+                socketId: 'local',
+                type: 'screen',
+                userName: (user?.name || 'You') + "'s Screen",
+                stream: localCameraStream || undefined // In startScreenShare, we set this to the screen stream state
+            });
+        }
+        // Remote Peers
+        peers.forEach(p => {
+            const state = peerMediaStates[p.socketId];
+            
+            // Camera (Always exists as a participant entry)
+            result.push({
+                id: p.socketId,
+                socketId: p.socketId,
+                type: 'camera',
+                userName: p.userName,
+                stream: p.stream
+            });
+
+            // Screen (Only if signaled AND we have a stream)
+            if (state?.screen && p.screenStream) {
+                result.push({
+                    id: p.socketId + '-screen',
+                    socketId: p.socketId,
+                    type: 'screen',
+                    userName: p.userName + "'s Screen",
+                    stream: p.screenStream
+                });
+            }
+        });
+        return result;
+    })();
+
+    const screenTile = tiles.find(t => t.type === 'screen');
+    const spotlightTileId = manualPinId || screenTile?.id || null;
+    const isSpotlightMode = spotlightTileId !== null;
+
+    useEffect(() => {
+        if (manualPinId && !tiles.find(t => t.id === manualPinId)) {
+            setManualPinId(null);
+        }
+    }, [tiles, manualPinId]);
+
+    const handlePin = (tileId: string) => {
+        setManualPinId(prev => (prev === tileId ? null : tileId));
+    };
 
     const {
         isRecording, isPaused, recordingDuration, startRecording, stopRecording, pauseRecording, resumeRecording,
@@ -165,6 +236,10 @@ export default function MeetingRoomPage() {
         isMicOn,
         isCamOn,
         isScreenSharing,
+        layoutMode: (isSpotlightMode ? 'spotlight' : 'grid') as 'spotlight' | 'grid',
+        spotlightId: spotlightTileId,
+        localCameraStream,
+        activeSpeakerId
     });
 
     const handleToggleRecording = () => {
@@ -206,6 +281,14 @@ export default function MeetingRoomPage() {
     const [handRaised, setHandRaised] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
 
+    // Auto-show sidebar when participants > 4
+    useEffect(() => {
+        if (peers.length >= 4 && !showSidebar) {
+            setShowSidebar(true);
+            setSidebarTab('participants');
+        }
+    }, [peers.length]);
+
     // Active speaker logic: priority to screen sharer, then current talker (mic on), then local if talking
     useEffect(() => {
         const screenSharer = peers.find((p: any) => peerMediaStates[p.socketId]?.screen);
@@ -225,6 +308,8 @@ export default function MeetingRoomPage() {
             }
         }
     }, [peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing]);
+
+
 
     // Join room + configure (host sends lobby config)
     useEffect(() => {
@@ -336,10 +421,10 @@ export default function MeetingRoomPage() {
         if (sid === 'local') return;
 
         if (action === 'pin') {
-            setPinnedPeerId(sid);
+            setManualPinId(sid);
             setIsParticipantModalOpen(false);
         } else if (action === 'unpin') {
-            setPinnedPeerId(null);
+            setManualPinId(null);
             setIsParticipantModalOpen(false);
         } else if (isHost && socket) {
             // Map actions to the specific contract: mute, stop-video, remove
@@ -367,10 +452,10 @@ export default function MeetingRoomPage() {
             userName: p.userName,
             isMicOn: p.isMicOn,
             isCamOn: p.isCamOn,
-            isPinned: p.socketId === pinnedPeerId,
+            isPinned: p.socketId === manualPinId,
         });
         setIsParticipantModalOpen(true);
-    }, [isHost, pinnedPeerId]);
+    }, [isHost, manualPinId]);
 
     // ── KEYBOARD SHORTCUTS ───────────────────────────────────────────────
     useEffect(() => {
@@ -445,30 +530,35 @@ export default function MeetingRoomPage() {
 
 
     return (
-        <div className="flex flex-col h-screen bg-[#0d0f18] text-text-primary overflow-hidden font-inter">
-            {/* ── TOP BAR (Google Meet 2025 Style) ── */}
-            <header className="flex items-center justify-between px-8 py-4 z-20">
+        <div className="flex flex-col h-screen bg-bg-primary text-text-primary overflow-hidden font-inter relative">
+            {/* Mesh Gradient Background Blobs */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/5 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent-success/5 blur-[120px] rounded-full pointer-events-none" />
+
+            {/* ── TOP BAR (Premium Glass Style) ── */}
+            <header className="flex items-center justify-between px-8 py-5 z-20 relative">
                 <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white shadow-lg shadow-accent/20">
-                            <Video size={20} />
+                    <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 rounded-2xl bg-accent flex items-center justify-center text-white shadow-lg shadow-accent/30 transition-transform hover:scale-105 active:scale-95 cursor-pointer">
+                            <Video size={22} strokeWidth={2.5} />
                         </div>
                         <div className="flex flex-col">
-                            <h1 className="text-lg font-bold tracking-tight text-white line-clamp-1 max-w-[200px] md:max-w-none">
+                            <h1 className="text-xl font-extrabold tracking-tight text-white line-clamp-1 max-w-[200px] md:max-w-none">
                                 {meeting.title || 'Meeting Room'}
                             </h1>
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] uppercase tracking-[0.2em] text-accent font-bold">
+                                <span className="text-[10px] uppercase tracking-[0.25em] text-accent font-black">
                                     {meetingCode}
                                 </span>
                                 <div className="w-1 h-1 rounded-full bg-white/20" />
-                                <span className="text-[10px] text-text-secondary font-medium">
+                                <span className="text-[10px] text-text-secondary font-bold">
                                     {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             </div>
                         </div>
                     </div>
                 </div>
+
 
                 {/* ── RECORDING ERROR ALERT ── */}
                 {recordingError && (
@@ -492,22 +582,23 @@ export default function MeetingRoomPage() {
 
                 <div className="flex items-center gap-4">
                     {(isRecording || isRemoteRecording) && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full animate-pulse mr-2">
-                            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">
+                        <div className="flex items-center gap-2.5 px-4 py-2 bg-accent-danger/10 text-accent-danger border border-accent-danger/20 rounded-full animate-pulse mr-2 shadow-[0_0_15px_rgba(255,82,82,0.1)]">
+                            <div className="w-2 h-2 rounded-full bg-accent-danger shadow-[0_0_10px_rgba(255,82,82,0.6)]" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.15em]">
                                 Recording {isRecording && `${Math.floor(recordingDuration / 60)}:${(recordingDuration % 60).toString().padStart(2, '0')}`}
                             </span>
                         </div>
                     )}
-                    <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
+                    <div className="flex items-center gap-2 px-4 py-2 glass-panel !bg-white/5 border-white/5 rounded-2xl">
+
                         <Users size={16} className="text-text-secondary" />
                         <span className="text-sm font-bold text-white/90">{peers.length + 1}</span>
                     </div>
                     <button
                         onClick={copyLink}
-                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold transition-all group"
+                        className="flex items-center gap-2 px-4 py-2 glass-panel !bg-white/5 hover:!bg-white/[0.08] border-white/10 rounded-2xl text-xs font-bold transition-all group"
                     >
-                        {copied ? <Check size={14} className="text-accent-success" /> : <Info size={14} className="group-hover:text-accent" />}
+                        {copied ? <Check size={14} className="text-accent-success" /> : <Info size={14} className="group-hover:text-accent transition-colors" />}
                         <span>{copied ? 'Link Copied' : 'Details'}</span>
                     </button>
                     {isHost && (
@@ -527,82 +618,171 @@ export default function MeetingRoomPage() {
             </header>
 
             {/* ── MAIN BODY ── */}
-            <main className="flex flex-1 relative overflow-hidden px-8 pb-32">
+            <main className="flex flex-1 relative overflow-hidden px-6 pb-28">
                 <div className={`flex-1 flex flex-col relative transition-all duration-500 ease-in-out ${showSidebar ? 'mr-[380px]' : ''}`}>
-                    {/* Video Grid */}
-                    <div className={`flex-1 min-h-0 flex flex-wrap items-center justify-center gap-6 p-4 ${showSidebar ? 'mr-0' : ''}`}>
-                        {/* Local Video - Active Speaker Priority */}
-                        <div className={`transition-all duration-700 ease-in-out ${peers.length === 0 ? 'w-full max-w-4xl aspect-video' :
-                                peers.length === 1 ? 'w-[calc(50%-12px)] aspect-video' :
-                                    peers.length === 2 ? 'w-[calc(33.33%-16px)] aspect-video' :
-                                        'w-[calc(25%-18px)] min-w-[300px] aspect-video'
-                            }`}>
-                            <VideoTile
-                                stream={localStream || undefined}
-                                userName={user?.name || 'You'}
-                                isLocal={true}
-                                isMicOn={isMicOn}
-                                isCamOn={isCamOn}
-                                isScreenShare={isScreenSharing}
-                                isMirrored={isMirrored}
-                                isActiveSpeaker={activeSpeakerId === 'local'}
-                                onContextMenu={() => openParticipantModal({ socketId: 'local', userName: user?.name || 'You', isMicOn, isCamOn })}
-                            />
-                        </div>
-
-                        {/* Remote Videos */}
-                        {peers
-                            .sort((a, b) => {
-                                if (a.socketId === pinnedPeerId) return -1;
-                                if (b.socketId === pinnedPeerId) return 1;
-                                return 0;
-                            })
-                            .map((p) => (
-                                <div key={p.socketId} className={`transition-all duration-700 ease-in-out ${peers.length === 1 ? 'w-[calc(50%-12px)] aspect-video' :
-                                        peers.length === 2 ? 'w-[calc(33.33%-16px)] aspect-video' :
-                                            'w-[calc(25%-18px)] min-w-[300px] aspect-video'
+                    {/* Video Grid / Spotlight Container */}
+                    <div className="flex-1 min-h-0 relative flex p-4 gap-6">
+                        
+                        {!isSpotlightMode ? (
+                            /* GRID MODE: Standard responsive grid with all tiles */
+                            <div className="flex-1 flex flex-wrap items-center justify-center gap-6 overflow-hidden content-center">
+                                {tiles.map((tile) => (
+                                    <div key={tile.id} className={`transition-all duration-700 ease-in-out flex items-center justify-center shrink min-h-0 ${
+                                        tiles.length === 1 ? 'w-full h-full max-w-3xl' :
+                                        tiles.length === 2 ? 'w-[calc(50%-12px)] h-full max-h-[85%]' :
+                                        tiles.length <= 4 ? 'w-[calc(50%-12px)] h-[calc(50%-12px)]' :
+                                        'w-[calc(33.33%-16px)] h-[calc(33.33%-16px)]'
                                     }`}>
-                                    <VideoTile
-                                        stream={p.stream}
-                                        userName={p.userName}
-                                        isMicOn={peerMediaStates[p.socketId]?.mic ?? false}
-                                        isCamOn={peerMediaStates[p.socketId]?.camera ?? false}
-                                        isScreenShare={peerMediaStates[p.socketId]?.screen ?? false}
-                                        isActiveSpeaker={activeSpeakerId === p.socketId}
-                                        isPinned={pinnedPeerId === p.socketId}
-                                        onClick={() => openParticipantModal({
-                                            socketId: p.socketId,
-                                            userName: p.userName,
-                                            isMicOn: peerMediaStates[p.socketId]?.mic ?? false,
-                                            isCamOn: peerMediaStates[p.socketId]?.camera ?? false
-                                        })}
-                                    />
+                                        <div className="w-full h-full max-h-full aspect-video flex items-center justify-center overflow-hidden rounded-2xl">
+                                            <VideoTile
+                                                stream={tile.stream}
+                                                userName={tile.userName}
+                                                isLocal={tile.socketId === 'local'}
+                                                isMicOn={tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false)}
+                                                isCamOn={tile.socketId === 'local' ? (tile.type === 'camera' ? isCamOn : true) : (tile.type === 'camera' ? (peerMediaStates[tile.socketId]?.camera ?? false) : true)}
+                                                isScreenShare={tile.type === 'screen'}
+                                                isMirrored={tile.socketId === 'local' && tile.type === 'camera' && isMirrored}
+                                                isActiveSpeaker={activeSpeakerId === tile.socketId}
+                                                isPinned={manualPinId === tile.id}
+                                                onPin={() => handlePin(tile.id)}
+                                                onContextMenu={() => openParticipantModal({ 
+                                                    socketId: tile.socketId, 
+                                                    userName: tile.userName, 
+                                                    isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false), 
+                                                    isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false) 
+                                                })}
+                                                onClick={() => tile.socketId !== 'local' && openParticipantModal({
+                                                    socketId: tile.socketId,
+                                                    userName: tile.userName,
+                                                    isMicOn: peerMediaStates[tile.socketId]?.mic ?? false,
+                                                    isCamOn: peerMediaStates[tile.socketId]?.camera ?? false
+                                                })}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            /* SPOTLIGHT MODE: 1 Large + Strip on right */
+                            <div className="flex-1 flex gap-6 min-h-0">
+                                {/* Main Spotlight Area */}
+                                <div className="flex-[4] relative group">
+                                    <div className="w-full h-full aspect-video md:aspect-auto max-h-full">
+                                        {(() => {
+                                            const tile = tiles.find(t => t.id === spotlightTileId);
+                                            if (!tile) return null;
+                                            
+                                            // Check for PiP partner (camera of the same socketId if we are spotlighting screen)
+                                            const pipTile = tile.type === 'screen' ? tiles.find(t => t.socketId === tile.socketId && t.type === 'camera') : null;
+
+                                            return (
+                                                <>
+                                                    <VideoTile
+                                                        stream={tile.stream}
+                                                        userName={tile.userName}
+                                                        isLocal={tile.socketId === 'local'}
+                                                        isMicOn={tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false)}
+                                                        isCamOn={tile.socketId === 'local' ? (tile.type === 'camera' ? isCamOn : true) : (tile.type === 'camera' ? (peerMediaStates[tile.socketId]?.camera ?? false) : true)}
+                                                        isScreenShare={tile.type === 'screen'}
+                                                        isMirrored={tile.socketId === 'local' && tile.type === 'camera' && isMirrored}
+                                                        isActiveSpeaker={activeSpeakerId === tile.socketId}
+                                                        isPinned={manualPinId === tile.id}
+                                                        isSpotlight={true}
+                                                        onPin={() => handlePin(tile.id)}
+                                                        onContextMenu={() => openParticipantModal({ 
+                                                            socketId: tile.socketId, 
+                                                            userName: tile.userName, 
+                                                            isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false), 
+                                                            isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false) 
+                                                        })}
+                                                        onClick={() => tile.socketId !== 'local' && openParticipantModal({
+                                                            socketId: tile.socketId,
+                                                            userName: tile.userName,
+                                                            isMicOn: peerMediaStates[tile.socketId]?.mic ?? false,
+                                                            isCamOn: peerMediaStates[tile.socketId]?.camera ?? false
+                                                        })}
+                                                    />
+                                                    
+                                                    {/* PiP Overlay */}
+                                                    {pipTile && (pipTile.socketId === 'local' ? (isCamOn && tile.stream) : peerMediaStates[pipTile.socketId]?.camera) && (
+                                                        <div className="absolute bottom-6 right-6 w-48 aspect-video rounded-2xl overflow-hidden border-2 border-accent/40 shadow-2xl z-40 transition-all hover:scale-105 group-hover:translate-x-0 group-hover:translate-y-0">
+                                                            <VideoTile
+                                                                stream={pipTile.stream}
+                                                                userName={pipTile.userName}
+                                                                isLocal={pipTile.socketId === 'local'}
+                                                                isMicOn={pipTile.socketId === 'local' ? isMicOn : (peerMediaStates[pipTile.socketId]?.mic ?? false)}
+                                                                isCamOn={true}
+                                                                isMirrored={pipTile.socketId === 'local' && isMirrored}
+                                                                className="!rounded-none !border-0"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
-                            ))}
+
+                                {/* Participant Strip Area */}
+                                <div className="flex-1 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-2 min-w-[240px]">
+                                    {tiles
+                                        .filter(t => t.id !== spotlightTileId)
+                                        .map(tile => (
+                                            <div key={tile.id} className="w-full aspect-video shrink-0">
+                                                <VideoTile
+                                                    stream={tile.stream}
+                                                    userName={tile.userName}
+                                                    isLocal={tile.socketId === 'local'}
+                                                    isMicOn={tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false)}
+                                                    isCamOn={tile.socketId === 'local' ? (tile.type === 'camera' ? isCamOn : true) : (tile.type === 'camera' ? (peerMediaStates[tile.socketId]?.camera ?? false) : true)}
+                                                    isScreenShare={tile.type === 'screen'}
+                                                    isMirrored={tile.socketId === 'local' && tile.type === 'camera' && isMirrored}
+                                                    isActiveSpeaker={activeSpeakerId === tile.socketId}
+                                                    isPinned={manualPinId === tile.id}
+                                                    onPin={() => handlePin(tile.id)}
+                                                    onContextMenu={() => openParticipantModal({ 
+                                                        socketId: tile.socketId, 
+                                                        userName: tile.userName, 
+                                                        isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false), 
+                                                        isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false) 
+                                                    })}
+                                                    onClick={() => tile.socketId !== 'local' && openParticipantModal({
+                                                        socketId: tile.socketId,
+                                                        userName: tile.userName,
+                                                        isMicOn: peerMediaStates[tile.socketId]?.mic ?? false,
+                                                        isCamOn: peerMediaStates[tile.socketId]?.camera ?? false
+                                                    })}
+                                                />
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Sidebar Overlay/Panel */}
-                <div className={`absolute top-0 right-0 h-full w-[350px] bg-bg-card/40 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] z-40 transition-all duration-500 ease-in-out shadow-2xl ${showSidebar ? 'translate-x-0' : 'translate-x-[400px]'}`}>
+                <div className={`absolute top-0 right-0 h-full w-[380px] glass-panel !rounded-l-[2.5rem] !rounded-r-none z-40 transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1) shadow-2xl ${showSidebar ? 'translate-x-0 opacity-100' : 'translate-x-[420px] opacity-0'}`}>
                     <div className="flex flex-col h-full">
-                        <div className="flex items-center justify-between p-6 border-b border-white/5">
-                            <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+                        <div className="flex items-center justify-between p-8 border-b border-white/5">
+                            <div className="flex gap-1 glass-panel !bg-white/5 p-1 rounded-2xl">
                                 <button
                                     onClick={() => setSidebarTab('participants')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${sidebarTab === 'participants' ? 'bg-accent text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${sidebarTab === 'participants' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-white/40 hover:text-white/70'}`}
                                 >
                                     People
                                 </button>
                                 <button
                                     onClick={() => setSidebarTab('chat')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${sidebarTab === 'chat' ? 'bg-accent text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${sidebarTab === 'chat' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-white/40 hover:text-white/70'}`}
                                 >
                                     Chat
                                 </button>
                                 {isHost && (
                                     <button
                                         onClick={() => setSidebarTab('lobby')}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${sidebarTab === 'lobby' ? 'bg-accent text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${sidebarTab === 'lobby' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-white/40 hover:text-white/70'}`}
                                     >
                                         Lobby
                                     </button>
@@ -627,22 +807,26 @@ export default function MeetingRoomPage() {
                                     </div>
                                     <div className="my-4 px-2 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Other Participants ({peers.length})</div>
                                     {peers.map((p) => (
-                                        <div key={p.socketId} className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-white/5 group">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-white/40 group-hover:bg-accent/20 group-hover:text-accent transition-all">
+                                        <div key={p.socketId} className="flex items-center justify-between p-4 glass-panel !bg-white/[0.02] hover:!bg-white/[0.08] rounded-2xl transition-all border-white/5 active:scale-[0.98] group cursor-pointer">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center font-bold text-white/40 group-hover:bg-accent/20 group-hover:text-accent transition-all shadow-inner">
                                                     {p.userName?.[0]?.toUpperCase()}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-sm font-semibold">{p.userName}</span>
-                                                    <span className="text-[10px] text-white/30">Online</span>
+                                                    <span className="text-sm font-bold text-white/90">{p.userName}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
+                                                        <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">Online</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                {!peerMediaStates[p.socketId]?.mic && <MicOff size={14} className="text-accent-danger" />}
-                                                {!peerMediaStates[p.socketId]?.camera && <VideoOff size={14} className="text-accent-danger" />}
+                                            <div className="flex gap-2.5">
+                                                {!peerMediaStates[p.socketId]?.mic && <div className="p-1.5 bg-accent-danger/10 rounded-lg text-accent-danger border border-accent-danger/20"><MicOff size={12} /></div>}
+                                                {!peerMediaStates[p.socketId]?.camera && <div className="p-1.5 bg-accent-danger/10 rounded-lg text-accent-danger border border-accent-danger/20"><VideoOff size={12} /></div>}
                                             </div>
                                         </div>
                                     ))}
+
                                 </div>
                             )}
 
@@ -650,16 +834,17 @@ export default function MeetingRoomPage() {
                                 <div className="flex flex-col h-full">
                                     <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
                                         {chatMessages.map((msg, i) => (
-                                            <div key={i} className={`flex flex-col gap-1 ${msg.userName === user?.name ? 'items-end' : 'items-start'}`}>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold text-white/30">{msg.userName}</span>
-                                                    <span className="text-[8px] text-white/20">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            <div key={i} className={`flex flex-col gap-1.5 ${msg.userName === user?.name ? 'items-end' : 'items-start'} max-w-[90%]`}>
+                                                <div className="flex items-center gap-2 px-1">
+                                                    <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">{msg.userName}</span>
+                                                    <span className="text-[9px] text-white/20 font-medium">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                 </div>
-                                                <div className={`px-4 py-2 rounded-2xl text-sm ${msg.userName === user?.name ? 'bg-accent text-white rounded-tr-none shadow-lg shadow-accent/20' : 'bg-white/5 text-white/90 rounded-tl-none border border-white/5'}`}>
+                                                <div className={`px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-lg ${msg.userName === user?.name ? 'bg-accent text-white rounded-tr-none shadow-accent/20' : 'glass-panel !bg-white/5 text-white/90 rounded-tl-none border-white/10'}`}>
                                                     {msg.message}
                                                 </div>
                                             </div>
                                         ))}
+
                                     </div>
                                     <div className="mt-4 flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/5 focus-within:border-accent/50 transition-all">
                                         <input
