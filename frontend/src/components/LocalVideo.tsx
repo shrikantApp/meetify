@@ -18,13 +18,9 @@ export default function LocalVideo({ stream, className = "", isMirrored = true, 
 
     useEffect(() => {
         if (videoRef.current && stream) {
-            console.log(`[LocalVideo] Updating srcObject. Tracks:`, stream.getTracks().map(t => t.kind));
             videoRef.current.srcObject = stream;
         }
     }, [stream]);
-
-    // Only mirror if it's NOT a screen share AND mirrored is preferred
-    const shouldMirror = !isScreenShare && isMirrored;
 
     return (
         <video
@@ -32,7 +28,7 @@ export default function LocalVideo({ stream, className = "", isMirrored = true, 
             autoPlay
             playsInline
             muted
-            className={`localVideo ${shouldMirror ? 'mirrored' : ''} ${className}`}
+            className={`localVideo ${isMirrored ? 'mirrored' : ''} ${className}`}
         />
     );
 }

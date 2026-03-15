@@ -154,9 +154,9 @@ export default function MeetingRoomPage() {
     const {
         isRecording, isPaused, recordingDuration, startRecording, stopRecording, pauseRecording, resumeRecording,
         error: recordingError, clearError: clearRecordingError
-    } = useRecording({ 
-        socket, 
-        meetingCode: meetingCode || '', 
+    } = useRecording({
+        socket,
+        meetingCode: meetingCode || '',
         meetingId: meeting?.id || '',
         hostId: user?.id || '',
         localStream,
@@ -476,7 +476,7 @@ export default function MeetingRoomPage() {
                                 </div>
                                 <p className="text-sm font-bold">{recordingError}</p>
                             </div>
-                            <button 
+                            <button
                                 onClick={clearRecordingError}
                                 className="p-2 hover:bg-white/10 rounded-lg transition-all"
                             >
@@ -526,23 +526,25 @@ export default function MeetingRoomPage() {
             <main className="flex flex-1 relative overflow-hidden px-8 pb-32">
                 <div className={`flex-1 flex flex-col relative transition-all duration-500 ease-in-out ${showSidebar ? 'mr-[380px]' : ''}`}>
                     {/* Video Grid */}
-                    <div className={`flex-1 min-h-0 grid gap-6 auto-rows-fr ${peers.length === 0 ? 'grid-cols-1' :
-                        peers.length === 1 ? 'grid-cols-1 md:grid-cols-2' :
-                            peers.length === 2 ? 'grid-cols-1 md:grid-cols-3' :
-                                'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                        }`}>
+                    <div className={`flex-1 min-h-0 flex flex-wrap items-center justify-center gap-6 p-4 ${showSidebar ? 'mr-0' : ''}`}>
                         {/* Local Video - Active Speaker Priority */}
-                        <VideoTile
-                            stream={localStream || undefined}
-                            userName={user?.name || 'You'}
-                            isLocal={true}
-                            isMicOn={isMicOn}
-                            isCamOn={isCamOn}
-                            isScreenShare={isScreenSharing}
-                            isMirrored={isMirrored}
-                            isActiveSpeaker={activeSpeakerId === 'local'}
-                            onContextMenu={() => openParticipantModal({ socketId: 'local', userName: user?.name || 'You', isMicOn, isCamOn })}
-                        />
+                        <div className={`transition-all duration-700 ease-in-out ${peers.length === 0 ? 'w-full max-w-4xl aspect-video' :
+                                peers.length === 1 ? 'w-[calc(50%-12px)] aspect-video' :
+                                    peers.length === 2 ? 'w-[calc(33.33%-16px)] aspect-video' :
+                                        'w-[calc(25%-18px)] min-w-[300px] aspect-video'
+                            }`}>
+                            <VideoTile
+                                stream={localStream || undefined}
+                                userName={user?.name || 'You'}
+                                isLocal={true}
+                                isMicOn={isMicOn}
+                                isCamOn={isCamOn}
+                                isScreenShare={isScreenSharing}
+                                isMirrored={isMirrored}
+                                isActiveSpeaker={activeSpeakerId === 'local'}
+                                onContextMenu={() => openParticipantModal({ socketId: 'local', userName: user?.name || 'You', isMicOn, isCamOn })}
+                            />
+                        </div>
 
                         {/* Remote Videos */}
                         {peers
@@ -552,8 +554,11 @@ export default function MeetingRoomPage() {
                                 return 0;
                             })
                             .map((p) => (
+                                <div key={p.socketId} className={`transition-all duration-700 ease-in-out ${peers.length === 1 ? 'w-[calc(50%-12px)] aspect-video' :
+                                        peers.length === 2 ? 'w-[calc(33.33%-16px)] aspect-video' :
+                                            'w-[calc(25%-18px)] min-w-[300px] aspect-video'
+                                    }`}>
                                     <VideoTile
-                                        key={p.socketId}
                                         stream={p.stream}
                                         userName={p.userName}
                                         isMicOn={peerMediaStates[p.socketId]?.mic ?? false}
@@ -568,6 +573,7 @@ export default function MeetingRoomPage() {
                                             isCamOn: peerMediaStates[p.socketId]?.camera ?? false
                                         })}
                                     />
+                                </div>
                             ))}
                     </div>
                 </div>
@@ -704,7 +710,7 @@ export default function MeetingRoomPage() {
                 onLeave={handleLeave}
             />
 
-            {/* Device Settings Modal */}
+            {/* Consolidated Settings Modal (Audio, Video, Appearance, General) */}
             <DeviceSettingsModal
                 isOpen={showSettings}
                 onClose={() => setShowSettings(false)}

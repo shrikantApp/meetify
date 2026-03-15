@@ -8,7 +8,7 @@ import {
     WebSocketServer,
 } from '@nestjs/websockets';
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
+import { Server, Socket, Namespace } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import type {
@@ -80,7 +80,7 @@ type AuthenticatedSocket = Socket & { user?: AuthPayload };
 export class EventsGateway
     implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
     @WebSocketServer()
-    server: Server;
+    server: Namespace;
 
     // ── In-memory stores (swap with Redis for horizontal scaling) ─────────
 
@@ -412,7 +412,7 @@ export class EventsGateway
             for (const [sid, info] of Object.entries(room.participants)) {
                 if (info.userId === client.user.sub) {
                     this.logDebug('removing stale session for user', { userId: info.userId, oldSocketId: sid, newSocketId: client.id });
-                    const oldSocket = this.server.of('/signaling').sockets.get(sid);
+                    const oldSocket = this.server.sockets.get(sid);
                     if (oldSocket) {
                         this.removeParticipant(oldSocket, 'leave-room');
                         oldSocket.disconnect();
@@ -730,7 +730,7 @@ export class EventsGateway
                     if (sid !== settings.hostSocketId && !settings.coHostSocketIds.has(sid)) {
                         pInfo.mediaState.mic = false;
                         // Emit to individual sockets to trigger local track stops
-                        const targetSocket = this.server.sockets.sockets.get(sid);
+                        const targetSocket = this.server.sockets.get(sid);
                         if (targetSocket) targetSocket.emit('force-mute');
                     }
                 }
@@ -743,7 +743,7 @@ export class EventsGateway
 
             case 'mute-participant': {
                 if (!data.targetSocketId) return;
-                const targetSocket = this.server.sockets.sockets.get(data.targetSocketId);
+                const targetSocket = this.server.sockets.get(data.targetSocketId);
                 if (targetSocket) {
                     targetSocket.emit('force-mute');
                     // Update internal state
@@ -756,7 +756,7 @@ export class EventsGateway
 
             case 'disable-camera': {
                 if (!data.targetSocketId) return;
-                const targetSocket = this.server.sockets.sockets.get(data.targetSocketId);
+                const targetSocket = this.server.sockets.get(data.targetSocketId);
                 if (targetSocket) {
                     targetSocket.emit('force-disable-cam');
                     // Update internal state
@@ -780,7 +780,7 @@ export class EventsGateway
 
             case 'remove-participant': {
                 if (!data.targetSocketId) return;
-                const targetSocket = this.server.sockets.sockets.get(data.targetSocketId);
+                const targetSocket = this.server.sockets.get(data.targetSocketId);
                 if (targetSocket) {
                     targetSocket.emit('host-action-applied', {
                         action: 'removed',
@@ -855,7 +855,7 @@ export class EventsGateway
 
                 // Disconnect all sockets in the room
                 for (const sid of Object.keys(room.participants)) {
-                    const s = this.server.sockets.sockets.get(sid);
+                    const s = this.server.sockets.get(sid);
                     if (s) {
                         void s.leave(data.roomId);
                     }
@@ -892,7 +892,7 @@ export class EventsGateway
         if (!data?.roomId || !data?.action || !data?.targetUserId) return;
         if (!this.isHostOrCoHost(client.id, data.roomId)) return;
 
-        const targetSocket = this.server.sockets.sockets.get(data.targetUserId);
+        const targetSocket = this.server.sockets.get(data.targetUserId);
         if (targetSocket) {
             let eventName = 'participant-action';
             let action = data.action;

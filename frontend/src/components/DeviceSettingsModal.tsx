@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
-import { Settings, Mic, Video, Speaker, Volume2, FlipHorizontal } from 'lucide-react';
+import { Settings, Mic, Video, Speaker, Volume2, FlipHorizontal, Type, Maximize2, MousePointer2 } from 'lucide-react';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface DeviceSettingsModalProps {
     isOpen: boolean;
@@ -26,7 +27,8 @@ export default function DeviceSettingsModal({
     isMirrored,
     onMirrorToggle,
 }: DeviceSettingsModalProps) {
-    const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'general'>('audio');
+    const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'appearance' | 'general'>('audio');
+    const { settings, updateSettings } = useSettings();
     const [volume, setVolume] = useState(0);
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
@@ -139,6 +141,12 @@ export default function DeviceSettingsModal({
                         <Video size={18} /> Video
                     </button>
                     <button
+                        onClick={() => setActiveTab('appearance')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'appearance' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <Type size={18} /> Appearance
+                    </button>
+                    <button
                         onClick={() => setActiveTab('general')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'general' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
                     >
@@ -226,6 +234,84 @@ export default function DeviceSettingsModal({
                                 <div className={`w-10 h-5 rounded-full transition-all relative ${isMirrored ? 'bg-accent' : 'bg-white/10'}`}>
                                     <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isMirrored ? 'right-1' : 'left-1'}`} />
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'appearance' && (
+                        <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                            {/* Theme Toggle */}
+                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                                <div className="space-y-1">
+                                    <p className="text-sm font-semibold text-white">Theme</p>
+                                    <p className="text-xs text-text-secondary">Switch between light and dark mode</p>
+                                </div>
+                                <button
+                                    onClick={() => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.theme === 'dark' ? 'bg-accent' : 'bg-gray-400'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            {/* Font Size Slider */}
+                            <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                        <Type size={16} className="text-accent" />
+                                        Font Size
+                                    </div>
+                                    <span className="text-xs font-mono text-accent bg-accent/10 px-2 py-0.5 rounded">{settings.fontSize}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="12"
+                                    max="20"
+                                    step="1"
+                                    value={settings.fontSize}
+                                    onChange={(e) => updateSettings({ fontSize: parseInt(e.target.value) })}
+                                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
+                                />
+                            </div>
+
+                            {/* Icon Size Slider */}
+                            <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                        <Maximize2 size={16} className="text-accent" />
+                                        Icon Size
+                                    </div>
+                                    <span className="text-xs font-mono text-accent bg-accent/10 px-2 py-0.5 rounded">{settings.iconSize}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="16"
+                                    max="28"
+                                    step="1"
+                                    value={settings.iconSize}
+                                    onChange={(e) => updateSettings({ iconSize: parseInt(e.target.value) })}
+                                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
+                                />
+                            </div>
+
+                            {/* Button Size Slider */}
+                            <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                        <MousePointer2 size={16} className="text-accent" />
+                                        Button Size
+                                    </div>
+                                    <span className="text-xs font-mono text-accent bg-accent/10 px-2 py-0.5 rounded">{settings.buttonSize}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="32"
+                                    max="56"
+                                    step="2"
+                                    value={settings.buttonSize}
+                                    onChange={(e) => updateSettings({ buttonSize: parseInt(e.target.value) })}
+                                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
+                                />
                             </div>
                         </div>
                     )}

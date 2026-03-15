@@ -11,10 +11,13 @@ function ProtectedRoute({ children }: { children: any }) {
   return user?.id ? children : <Navigate to="/login" replace />;
 }
 
+import { SettingsProvider } from './contexts/SettingsContext';
+
 export default function App() {
   const { user } = useAuth();
   return (
-    <Routes>
+    <SettingsProvider>
+      <Routes>
       {!user?.id && (
         <React.Fragment>
           <Route path="/login" element={<LoginPage />} />
@@ -39,5 +42,6 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </SettingsProvider>
   );
 }

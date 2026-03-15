@@ -1,4 +1,4 @@
-
+import React from 'react';
 import {
     Mic, MicOff, Video, VideoOff, Monitor,
     Hand, Users, PhoneOff, Settings, Circle, Play, Pause
@@ -46,25 +46,27 @@ export default function MeetingControls({
     onLeave,
 }: MeetingControlsProps) {
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-6 py-4 bg-bg-card/40 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 animate-in slide-in-from-bottom-8 duration-700">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3.5 bg-bg-card/60 backdrop-blur-3xl border border-white/10 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 animate-in slide-in-from-bottom-12 duration-1000 ease-out hover:bg-bg-card/70 transition-colors">
             {/* Media Controls */}
             <div className="flex items-center gap-3 pr-4 border-r border-white/10">
                 <button
                     onClick={onToggleMic}
-                    className={`group relative p-3.5 rounded-full transition-all duration-300 ${isMicOn ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-accent-danger text-white shadow-lg shadow-accent-danger/20'}`}
+                    style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                    className={`group relative flex items-center justify-center rounded-full transition-all duration-500 hover:scale-110 active:scale-95 ${isMicOn ? 'bg-white/5 hover:bg-white/10 text-white border border-white/5' : 'bg-red-500 text-white shadow-xl shadow-red-500/20'}`}
                 >
-                    {isMicOn ? <Mic size={20} /> : <MicOff size={20} />}
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    {isMicOn ? <Mic size={'var(--ui-icon-size)'} className="transition-transform group-hover:rotate-12" /> : <MicOff size={'var(--ui-icon-size)'} />}
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                         {isMicOn ? 'Mute' : 'Unmute'} (Ctrl+D)
                     </div>
                 </button>
 
                 <button
                     onClick={onToggleCam}
-                    className={`group relative p-3.5 rounded-full transition-all duration-300 ${isCamOn ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-accent-danger text-white shadow-lg shadow-accent-danger/20'}`}
+                    style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                    className={`group relative flex items-center justify-center rounded-full transition-all duration-500 hover:scale-110 active:scale-95 ${isCamOn ? 'bg-white/5 hover:bg-white/10 text-white border border-white/5' : 'bg-red-500 text-white shadow-xl shadow-red-500/20'}`}
                 >
-                    {isCamOn ? <Video size={20} /> : <VideoOff size={20} />}
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    {isCamOn ? <Video size={'var(--ui-icon-size)'} className="transition-transform group-hover:rotate-12" /> : <VideoOff size={'var(--ui-icon-size)'} />}
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                         {isCamOn ? 'Stop Video' : 'Start Video'} (Ctrl+E)
                     </div>
                 </button>
@@ -74,43 +76,46 @@ export default function MeetingControls({
             <div className="flex items-center gap-3 px-4 border-r border-white/10">
                 <button
                     onClick={onToggleScreenShare}
-                    className={`group relative p-3.5 rounded-full transition-all duration-300 ${isScreenSharing ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                    style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                    className={`group relative flex items-center justify-center rounded-full transition-all duration-500 hover:scale-110 active:scale-95 ${isScreenSharing ? 'bg-accent text-white shadow-2xl shadow-accent/40 scale-110' : 'bg-white/5 hover:bg-white/10 text-white border border-white/5'}`}
                 >
-                    <Monitor size={20} />
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    <Monitor size={'var(--ui-icon-size)'} className={isScreenSharing ? 'animate-pulse' : ''} />
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                         {isScreenSharing ? 'Stop Presenting' : 'Present now'}
                     </div>
                 </button>
 
                 <button
                     onClick={onToggleHand}
-                    className={`group relative p-3.5 rounded-full transition-all duration-300 ${handRaised ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'bg-white/5 hover:bg-white/10 text-white italic'}`}
+                    style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                    className={`group relative flex items-center justify-center rounded-full transition-all duration-500 hover:scale-110 active:scale-95 ${handRaised ? 'bg-accent text-white shadow-2xl shadow-accent/40 scale-110' : 'bg-white/5 hover:bg-white/10 text-white border border-white/5'}`}
                 >
-                    <Hand size={20} />
-                    {handRaised && <span className="absolute -top-1 -right-1 flex h-3 w-3 rounded-full bg-accent animate-ping" />}
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                        Raise hand
+                    <Hand size={'var(--ui-icon-size)'} className={handRaised ? 'animate-bounce' : ''} />
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
+                        {handRaised ? 'Lower hand' : 'Raise hand'}
                     </div>
                 </button>
 
                 <button
                     onClick={onOpenSettings}
-                    className="group relative p-3.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"
+                    style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                    className="group relative flex items-center justify-center bg-white/5 hover:bg-white/10 text-white rounded-full transition-all duration-500 hover:scale-110 active:scale-95 border border-white/5"
                 >
-                    <Settings size={20} />
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    <Settings size={'var(--ui-icon-size)'} className="group-hover:rotate-90 transition-transform duration-700" />
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                         Settings
                     </div>
                 </button>
 
                 {isHost && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                         <button
                             onClick={onToggleRecording}
-                            className={`group relative p-3.5 rounded-full transition-all duration-300 ${isRecording ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                            style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                            className={`group relative flex items-center justify-center rounded-full transition-all duration-500 hover:scale-110 active:scale-95 ${isRecording ? 'bg-red-600 text-white shadow-2xl shadow-red-600/40' : 'bg-white/5 hover:bg-white/10 text-white border border-white/5'}`}
                         >
-                            <Circle size={20} className={isRecording ? 'fill-current' : ''} />
-                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                            <Circle size={'var(--ui-icon-size)'} className={isRecording ? 'fill-current animate-pulse' : ''} />
+                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                                 {isRecording ? 'Stop Recording' : 'Record Meeting'}
                             </div>
                         </button>
@@ -118,10 +123,11 @@ export default function MeetingControls({
                         {isRecording && (
                             <button
                                 onClick={isPaused ? onResumeRecording : onPauseRecording}
-                                className="group relative p-3.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"
+                                style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                                className="group relative flex items-center justify-center bg-white/5 hover:bg-white/10 text-white rounded-full transition-all duration-500 hover:scale-110 active:scale-95 border border-white/5"
                             >
-                                {isPaused ? <Play size={20} className="fill-current" /> : <Pause size={20} className="fill-current" />}
-                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                {isPaused ? <Play size={'var(--ui-icon-size)'} className="fill-current" /> : <Pause size={'var(--ui-icon-size)'} className="fill-current" />}
+                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                                     {isPaused ? 'Resume Recording' : 'Pause Recording'}
                                 </div>
                             </button>
@@ -134,20 +140,22 @@ export default function MeetingControls({
             <div className="flex items-center gap-3 pl-4">
                 <button
                     onClick={onToggleSidebar}
-                    className={`group relative p-3.5 rounded-full transition-all duration-300 ${showSidebar ? 'bg-white/20 text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                    style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                    className={`group relative flex items-center justify-center rounded-full transition-all duration-500 hover:scale-110 active:scale-95 ${showSidebar ? 'bg-accent/20 text-accent border border-accent/20' : 'bg-white/5 hover:bg-white/10 text-white border border-white/5'}`}
                 >
-                    <Users size={20} />
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    <Users size={'var(--ui-icon-size)'} />
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                         Meeting details
                     </div>
                 </button>
 
                 <button
                     onClick={onLeave}
-                    className="group relative p-3.5 bg-accent-danger hover:bg-accent-danger/80 text-white rounded-full shadow-lg shadow-accent-danger/40 transition-all active:scale-90"
+                    style={{ width: 'var(--ui-button-size)', height: 'var(--ui-button-size)' }}
+                    className="group relative flex items-center justify-center bg-red-600 hover:bg-red-500 text-white rounded-full shadow-2xl shadow-red-600/50 transition-all duration-500 hover:scale-110 active:scale-90 border border-white/10"
                 >
-                    <PhoneOff size={20} />
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/80 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    <PhoneOff size={'var(--ui-icon-size)'} />
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-lg text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-y-2 group-hover:translate-y-0 shadow-2xl border border-white/10">
                         Leave call
                     </div>
                 </button>
