@@ -158,9 +158,13 @@ export default function MeetingRoomPage() {
         socket,
         meetingCode: meetingCode || '',
         meetingId: meeting?.id || '',
+        meetingTitle: meeting?.title || 'Meeting Room',
         hostId: user?.id || '',
         localStream,
-        peers
+        peers,
+        isMicOn,
+        isCamOn,
+        isScreenSharing,
     });
 
     const handleToggleRecording = () => {

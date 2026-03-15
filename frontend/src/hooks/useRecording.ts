@@ -6,12 +6,16 @@ interface UseRecordingProps {
     socket: Socket | null;
     meetingCode: string;
     meetingId: string;
+    meetingTitle: string;
     hostId: string;
     localStream: MediaStream | null;
     peers: any[]; // RemotePeer[]
+    isMicOn: boolean;
+    isCamOn: boolean;
+    isScreenSharing: boolean;
 }
 
-export function useRecording({ socket, meetingCode, meetingId, hostId, localStream, peers }: UseRecordingProps) {
+export function useRecording({ socket, meetingCode, meetingId, meetingTitle, hostId, localStream, peers, isMicOn, isCamOn, isScreenSharing }: UseRecordingProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
@@ -133,11 +137,12 @@ export function useRecording({ socket, meetingCode, meetingId, hostId, localStre
                 // Draw Inner Box
                 const video = tile.querySelector('video');
                 const isCamOn = tile.getAttribute('data-iscamon') === 'true';
+                const isScreenShare = tile.getAttribute('data-isscreenshare') === 'true';
                 const userName = tile.getAttribute('data-username') || 'Participant';
                 const isLocalTile = tile.getAttribute('data-islocal') === 'true';
                 const isMirrored = tile.getAttribute('data-ismirrored') === 'true';
 
-                if (video && video.readyState >= 2 && isCamOn) {
+                if (video && video.readyState >= 2 && (isCamOn || isScreenShare)) {
                     // Draw video
                     const videoRatio = video.videoWidth / video.videoHeight;
                     const cellRatio = rw / rh;
@@ -148,19 +153,35 @@ export function useRecording({ socket, meetingCode, meetingId, hostId, localStre
                     let drawY = ry;
 
                     if (videoRatio && cellRatio) {
-                        if (videoRatio > cellRatio) {
-                            drawWidth = rh * videoRatio;
-                            drawX = rx - (drawWidth - rw) / 2;
+                        if (isScreenShare) {
+                            // Contain-fit: letterbox the screen share so all content is visible
+                            if (videoRatio > cellRatio) {
+                                drawHeight = rw / videoRatio;
+                                drawY = ry + (rh - drawHeight) / 2;
+                                drawWidth = rw;
+                                drawX = rx;
+                            } else {
+                                drawWidth = rh * videoRatio;
+                                drawX = rx + (rw - drawWidth) / 2;
+                                drawHeight = rh;
+                                drawY = ry;
+                            }
                         } else {
-                            drawHeight = rw / videoRatio;
-                            drawY = ry - (drawHeight - rh) / 2;
+                            // Object-cover: crop to fill for camera tiles
+                            if (videoRatio > cellRatio) {
+                                drawWidth = rh * videoRatio;
+                                drawX = rx - (drawWidth - rw) / 2;
+                            } else {
+                                drawHeight = rw / videoRatio;
+                                drawY = ry - (drawHeight - rh) / 2;
+                            }
                         }
                     }
 
                     try {
                          ctx.save();
-                         // Apply flip transform if mirrored (like local webcam)
-                         if (isMirrored) {
+                         // Apply flip transform only for local webcam, never for screen shares
+                         if (isMirrored && !isScreenShare) {
                              ctx.translate(drawX + drawWidth / 2, drawY + drawHeight / 2);
                              ctx.scale(-1, 1);
                              ctx.translate(-(drawX + drawWidth / 2), -(drawY + drawHeight / 2));
@@ -227,133 +248,346 @@ export function useRecording({ socket, meetingCode, meetingId, hostId, localStre
             });
         }
 
-        // --- Header Mockup ---
-        // Top left
-        ctx.fillStyle = '#6c63ff'; // accent
-        ctx.beginPath();
-        ctx.roundRect(32, 16, 40, 40, 12);
-        ctx.fill();
-        ctx.fillStyle = 'white';
-        // Icon fake: camera lens
-        ctx.beginPath();
-        ctx.roundRect(42, 28, 14, 12, 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(56, 30);
-        ctx.lineTo(62, 26);
-        ctx.lineTo(62, 42);
-        ctx.lineTo(56, 38);
-        ctx.fill();
+        // ═══════════════════════════════════════════════════════════════
+        // HEADER — matches MeetingRoomPage.tsx header layout
+        // ═══════════════════════════════════════════════════════════════
+        const hdrY = 16;
 
-        // Title
+        // Logo icon (accent rounded square with camera icon)
+        ctx.fillStyle = '#6c63ff';
+        ctx.beginPath();
+        ctx.roundRect(32, hdrY, 40, 40, 12);
+        ctx.fill();
+        // Camera icon inside logo
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'transparent';
+        ctx.beginPath();
+        ctx.roundRect(40, hdrY + 12, 16, 14, 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(56, hdrY + 14);
+        ctx.lineTo(64, hdrY + 10);
+        ctx.lineTo(64, hdrY + 30);
+        ctx.lineTo(56, hdrY + 26);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Meeting title
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 18px Arial, sans-serif';
+        ctx.font = 'bold 16px Inter, Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText('STANDERED', 84, 18);
+        ctx.fillText(meetingTitle || 'Meeting Room', 84, hdrY + 2);
 
-        // Subtitle
-        ctx.fillStyle = '#6c63ff'; // accent text
-        ctx.font = 'bold 10px Arial, sans-serif';
+        // Meeting code • time subtitle
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        ctx.fillText(`${meetingCode ? meetingCode.toUpperCase() : 'MEETING'} • ${timeStr}`, 84, 42);
+        ctx.fillStyle = '#6c63ff';
+        ctx.font = 'bold 10px Inter, Arial, sans-serif';
+        ctx.fillText(meetingCode ? meetingCode.toUpperCase() : '', 84, hdrY + 24);
+        // Dot separator
+        const codeWidth = ctx.measureText(meetingCode ? meetingCode.toUpperCase() : '').width;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.arc(84 + codeWidth + 8, hdrY + 29, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Time
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '500 10px Inter, Arial, sans-serif';
+        ctx.fillText(timeStr, 84 + codeWidth + 16, hdrY + 24);
 
-        // Top right buttons
-        ctx.font = 'bold 12px Arial, sans-serif';
-        ctx.textAlign = 'center';
+        // Right side header items
+        const rightX = canvas.width - 32;
+        ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
+        // Recording indicator (red dot + "Recording")
+        const recBadgeW = 100;
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+        ctx.beginPath();
+        ctx.roundRect(rightX - recBadgeW - 80, hdrY + 6, recBadgeW, 28, 14);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Red dot
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(rightX - recBadgeW - 80 + 16, hdrY + 20, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // "REC" text
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 10px Inter, Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('RECORDING', rightX - recBadgeW - 80 + 26, hdrY + 23);
+
+        // Participant count badge
+        const countText = `${count}`;
+        ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.beginPath();
-        ctx.roundRect(canvas.width - 290, 20, 50, 32, 16);
+        ctx.roundRect(rightX - 68, hdrY + 4, 60, 32, 16);
         ctx.fill();
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillText(`👥 ${count + 1}`, canvas.width - 265, 36);
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        // User icon (simple silhouette)
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1.5;
+        const uIconX = rightX - 50;
+        const uIconY = hdrY + 20;
         ctx.beginPath();
-        ctx.roundRect(canvas.width - 228, 20, 80, 32, 16);
-        ctx.fill();
+        ctx.arc(uIconX, uIconY - 4, 5, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillText('ⓘ Details', canvas.width - 188, 36);
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.beginPath();
-        ctx.roundRect(canvas.width - 136, 20, 104, 32, 16);
-        ctx.fill();
+        ctx.arc(uIconX, uIconY + 8, 9, Math.PI + 0.4, -0.4);
         ctx.stroke();
+        // Count number
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillText('⚙ Host Controls', canvas.width - 84, 36);
+        ctx.font = 'bold 13px Inter, Arial, sans-serif';
+        ctx.fillText(countText, rightX - 24, hdrY + 20);
 
+        // ═══════════════════════════════════════════════════════════════
+        // FLOATING BOTTOM CONTROL BAR — matches MeetingControls.tsx
+        // ═══════════════════════════════════════════════════════════════
+        const btnR = 20; // button radius
+        const btnGap = 14;
+        const btnDiam = btnR * 2;
 
-        // --- Floating Bottom Bar Mockup ---
-        const pillWidth = 540;
-        const pillHeight = 72;
+        // Calculate total width: [Mic][Cam] | [Screen][Hand][Settings][Record] | [Users][Leave]
+        const g1Count = 2; // Mic, Cam
+        const g2Count = 4; // Screen, Hand, Settings, Record
+        const g3Count = 2; // Users, Leave
+        const dividerW = 20; // space for each divider
+        const g1W = g1Count * btnDiam + (g1Count - 1) * btnGap;
+        const g2W = g2Count * btnDiam + (g2Count - 1) * btnGap;
+        const g3W = g3Count * btnDiam + (g3Count - 1) * btnGap;
+        const pillPadding = 22;
+        const pillWidth = g1W + dividerW + g2W + dividerW + g3W + pillPadding * 2;
+        const pillHeight = 64;
         const pillX = canvas.width / 2 - pillWidth / 2;
         const pillY = canvas.height - pillHeight - 24; // bottom-6
+        const btnCenterY = pillY + pillHeight / 2;
 
-        // bg-card/40 backdrop-blur mock (just dark card)
-        ctx.fillStyle = '#1a1e35'; 
+        // Pill background (bg-card/60 with border)
+        ctx.fillStyle = 'rgba(26, 30, 53, 0.7)';
         ctx.beginPath();
-        ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 36);
+        ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 32);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; // border-white/10
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        let currentOffsetX = pillX + 24;
-
-        // Group 1: Mic/Cam
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.beginPath(); ctx.arc(currentOffsetX + 20, pillY + 36, 20, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'white'; ctx.fillText('🎤', currentOffsetX + 20, pillY + 36);
-        currentOffsetX += 48;
-
-        ctx.fillStyle = '#e05250'; // accent-danger logic
-        ctx.beginPath(); ctx.arc(currentOffsetX + 20, pillY + 36, 20, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'white'; ctx.fillText('📷', currentOffsetX + 20, pillY + 36);
-        currentOffsetX += 56;
-
-        // Divider
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.beginPath(); ctx.moveTo(currentOffsetX, pillY + 16); ctx.lineTo(currentOffsetX, pillY + pillHeight - 16); ctx.stroke();
-        currentOffsetX += 16;
-
-        // Group 2: Present, Hand, Settings, Record
-        const numFeature = 4;
-        for (let i = 0; i < numFeature; i++) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.beginPath(); ctx.arc(currentOffsetX + 20, pillY + 36, 20, 0, Math.PI * 2); ctx.fill();
-            if (i===0) { ctx.fillStyle = 'white'; ctx.fillText('💻', currentOffsetX + 20, pillY + 36); }
-            if (i===1) { ctx.fillStyle = 'white'; ctx.fillText('✋', currentOffsetX + 20, pillY + 36); }
-            if (i===2) { ctx.fillStyle = 'white'; ctx.fillText('⚙', currentOffsetX + 20, pillY + 36); }
-            if (i===3) { 
-                ctx.fillStyle = 'transparent'; 
-                ctx.strokeStyle = 'white'; 
-                ctx.beginPath(); ctx.arc(currentOffsetX + 20, pillY + 36, 12, 0, Math.PI * 2); ctx.stroke(); 
+        // Helper: draw a circular button
+        const drawBtn = (cx: number, cy: number, bg: string, border?: string) => {
+            ctx.fillStyle = bg;
+            ctx.beginPath();
+            ctx.arc(cx, cy, btnR, 0, Math.PI * 2);
+            ctx.fill();
+            if (border) {
+                ctx.strokeStyle = border;
+                ctx.lineWidth = 1;
+                ctx.stroke();
             }
-            currentOffsetX += 48;
+        };
+
+        let bx = pillX + pillPadding + btnR; // center x of first button
+
+        // ── Group 1: Mic, Cam ──
+        // Mic button
+        drawBtn(bx, btnCenterY, isMicOn ? 'rgba(255,255,255,0.05)' : '#dc2626', isMicOn ? 'rgba(255,255,255,0.05)' : undefined);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        if (isMicOn) {
+            // Mic icon
+            ctx.beginPath();
+            ctx.roundRect(bx - 4, btnCenterY - 9, 8, 14, 4);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(bx, btnCenterY + 1, 8, 0, Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(bx, btnCenterY + 9);
+            ctx.lineTo(bx, btnCenterY + 12);
+            ctx.stroke();
+        } else {
+            // MicOff icon
+            ctx.beginPath();
+            ctx.roundRect(bx - 4, btnCenterY - 9, 8, 14, 4);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(bx, btnCenterY + 1, 8, 0, Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(bx - 8, btnCenterY - 10);
+            ctx.lineTo(bx + 8, btnCenterY + 10);
+            ctx.stroke();
         }
 
-        currentOffsetX += 8;
-        // Divider
-        ctx.beginPath(); ctx.moveTo(currentOffsetX, pillY + 16); ctx.lineTo(currentOffsetX, pillY + pillHeight - 16); ctx.stroke();
-        currentOffsetX += 16;
+        bx += btnDiam + btnGap;
 
-        // Group 3: Users, End Call
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.beginPath(); ctx.arc(currentOffsetX + 20, pillY + 36, 20, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'white'; ctx.fillText('👥', currentOffsetX + 20, pillY + 36);
-        currentOffsetX += 48;
+        // Cam button
+        drawBtn(bx, btnCenterY, isCamOn ? 'rgba(255,255,255,0.05)' : '#dc2626', isCamOn ? 'rgba(255,255,255,0.05)' : undefined);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        if (isCamOn) {
+            // Video icon
+            ctx.beginPath();
+            ctx.roundRect(bx - 10, btnCenterY - 6, 14, 12, 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(bx + 4, btnCenterY - 3);
+            ctx.lineTo(bx + 11, btnCenterY - 7);
+            ctx.lineTo(bx + 11, btnCenterY + 7);
+            ctx.lineTo(bx + 4, btnCenterY + 3);
+            ctx.stroke();
+        } else {
+            // VideoOff icon
+            ctx.beginPath();
+            ctx.roundRect(bx - 10, btnCenterY - 6, 14, 12, 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(bx + 4, btnCenterY - 3);
+            ctx.lineTo(bx + 11, btnCenterY - 7);
+            ctx.lineTo(bx + 11, btnCenterY + 7);
+            ctx.lineTo(bx + 4, btnCenterY + 3);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(bx - 10, btnCenterY - 8);
+            ctx.lineTo(bx + 10, btnCenterY + 8);
+            ctx.stroke();
+        }
 
-        ctx.fillStyle = '#e05250'; // danger
-        ctx.beginPath(); ctx.arc(currentOffsetX + 20, pillY + 36, 20, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'white'; ctx.fillText('📞', currentOffsetX + 20, pillY + 36);
+        bx += btnDiam + btnGap;
 
-    }, [isRecording, isPaused]);
+        // ── Divider 1 ──
+        const dvX1 = bx - btnGap / 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(dvX1, pillY + 16);
+        ctx.lineTo(dvX1, pillY + pillHeight - 16);
+        ctx.stroke();
+        bx += dividerW - btnGap; // adjust for divider space
+
+        // ── Group 2: Screen Share, Hand, Settings, Record ──
+        // Screen share
+        drawBtn(bx, btnCenterY, isScreenSharing ? '#6c63ff' : 'rgba(255,255,255,0.05)', isScreenSharing ? undefined : 'rgba(255,255,255,0.05)');
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        // Monitor icon
+        ctx.beginPath();
+        ctx.roundRect(bx - 10, btnCenterY - 8, 20, 14, 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx, btnCenterY + 6);
+        ctx.lineTo(bx, btnCenterY + 10);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx - 5, btnCenterY + 10);
+        ctx.lineTo(bx + 5, btnCenterY + 10);
+        ctx.stroke();
+
+        bx += btnDiam + btnGap;
+
+        // Hand raise
+        drawBtn(bx, btnCenterY, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.05)');
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        // Hand icon (simplified)
+        ctx.beginPath();
+        ctx.moveTo(bx - 1, btnCenterY + 10);
+        ctx.lineTo(bx - 1, btnCenterY - 2);
+        ctx.lineTo(bx - 1, btnCenterY - 10);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx + 5, btnCenterY - 9);
+        ctx.lineTo(bx + 5, btnCenterY + 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx - 7, btnCenterY - 6);
+        ctx.lineTo(bx - 7, btnCenterY + 2);
+        ctx.stroke();
+
+        bx += btnDiam + btnGap;
+
+        // Settings
+        drawBtn(bx, btnCenterY, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.05)');
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        // Gear icon (circle + small ticks around)
+        ctx.beginPath();
+        ctx.arc(bx, btnCenterY, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let a = 0; a < 8; a++) {
+            const angle = (a / 8) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(bx + Math.cos(angle) * 7, btnCenterY + Math.sin(angle) * 7);
+            ctx.lineTo(bx + Math.cos(angle) * 10, btnCenterY + Math.sin(angle) * 10);
+            ctx.stroke();
+        }
+
+        bx += btnDiam + btnGap;
+
+        // Record button (red circle with inner filled circle)
+        drawBtn(bx, btnCenterY, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.05)');
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(bx, btnCenterY, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(bx, btnCenterY, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        bx += btnDiam + btnGap;
+
+        // ── Divider 2 ──
+        const dvX2 = bx - btnGap / 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(dvX2, pillY + 16);
+        ctx.lineTo(dvX2, pillY + pillHeight - 16);
+        ctx.stroke();
+        bx += dividerW - btnGap;
+
+        // ── Group 3: Users, Leave ──
+        // Users
+        drawBtn(bx, btnCenterY, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.05)');
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        // Users icon (two person silhouettes)
+        ctx.beginPath();
+        ctx.arc(bx - 3, btnCenterY - 4, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(bx - 3, btnCenterY + 6, 7, Math.PI + 0.5, -0.5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(bx + 6, btnCenterY - 3, 3, 0, Math.PI * 2);
+        ctx.stroke();
+
+        bx += btnDiam + btnGap;
+
+        // Leave call (red)
+        drawBtn(bx, btnCenterY, '#dc2626');
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        // PhoneOff icon (phone with slash)
+        ctx.beginPath();
+        ctx.moveTo(bx - 8, btnCenterY - 2);
+        ctx.quadraticCurveTo(bx - 6, btnCenterY - 8, bx, btnCenterY - 6);
+        ctx.quadraticCurveTo(bx + 6, btnCenterY - 8, bx + 8, btnCenterY - 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx - 7, btnCenterY - 6);
+        ctx.lineTo(bx + 7, btnCenterY + 6);
+        ctx.stroke();
+
+    }, [isRecording, isPaused, isMicOn, isCamOn, isScreenSharing, meetingTitle, meetingCode, peers]);
 
     // Start drawing loop when recording starts
     useEffect(() => {

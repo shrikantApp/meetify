@@ -46,6 +46,7 @@ export default function VideoTile({
             data-ismicon={isMicOn}
             data-islocal={isLocal}
             data-ismirrored={isMirrored}
+            data-isscreenshare={isScreenShare}
         >
             {/* Video Element - Modularized */}
             {stream && (
