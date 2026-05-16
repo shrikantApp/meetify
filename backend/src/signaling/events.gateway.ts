@@ -11,6 +11,8 @@ import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Server, Socket, Namespace } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { MeetingsService } from '../meetings/meetings.service';
+import { UsersService } from '../users/users.service';
 import type {
     MediaState,
     JoinRequest,
@@ -102,6 +104,8 @@ export class EventsGateway
     constructor(
         private readonly jwtService: JwtService,
         private readonly configService: ConfigService,
+        private readonly meetingsService: MeetingsService,
+        private readonly usersService: UsersService,
     ) { }
 
     // ── LIFECYCLE ────────────────────────────────────────────────────────
@@ -136,7 +140,7 @@ export class EventsGateway
     // ── HELPERS ──────────────────────────────────────────────────────────
 
     /** Remove a participant from room bookkeeping and notify peers. */
-    private removeParticipant(client: Socket, reason: 'disconnect' | 'leave-room') {
+    private async removeParticipant(client: Socket, reason: 'disconnect' | 'leave-room') {
         let targetRoomId: string | null = null;
         let participantInfo: ParticipantInfo | null = null;
 
@@ -145,6 +149,17 @@ export class EventsGateway
                 targetRoomId = roomId;
                 participantInfo = room.participants[client.id];
                 break;
+            }
+        }
+
+        // Record leave in DB if we have a participant record
+        const dbParticipantId = (client as any).dbParticipantId;
+        if (dbParticipantId) {
+            try {
+                await this.meetingsService.recordLeave(dbParticipantId);
+                (client as any).dbParticipantId = undefined;
+            } catch (e) {
+                this.logDebug('db leave record failed', { error: e.message });
             }
         }
 
@@ -269,7 +284,7 @@ export class EventsGateway
     }
 
     /** Admit a participant into the room (shared by direct join and lobby approve). */
-    private admitParticipant(
+    private async admitParticipant(
         targetSocketId: string,
         userId: string,
         roomId: string,
@@ -279,6 +294,21 @@ export class EventsGateway
     ) {
         // Safely force the target socket into the room without traversing internal map
         this.server.in(targetSocketId).socketsJoin(roomId);
+
+        // Record in DB
+        try {
+            const meeting = await this.meetingsService.findByCode(roomId);
+            const user = await this.usersService.findOne(userId);
+            if (meeting && user) {
+                const participant = await this.meetingsService.recordJoin(meeting, user);
+                const targetSocket = (this.server as any).sockets.get(targetSocketId);
+                if (targetSocket) {
+                    (targetSocket as any).dbParticipantId = participant.id;
+                }
+            }
+        } catch (e) {
+            this.logDebug('db join record failed', { error: e.message });
+        }
 
         const participant: ParticipantInfo = {
             roomId,
@@ -386,9 +416,9 @@ export class EventsGateway
         }
     }
 
-    handleDisconnect(client: Socket) {
+    async handleDisconnect(client: Socket) {
         this.removePendingRequest(client);
-        this.removeParticipant(client, 'disconnect');
+        await this.removeParticipant(client, 'disconnect');
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -396,7 +426,7 @@ export class EventsGateway
     // ══════════════════════════════════════════════════════════════════════
 
     @SubscribeMessage('join-room')
-    handleJoinRoom(
+    async handleJoinRoom(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: JoinRoomPayload,
     ) {
@@ -424,7 +454,7 @@ export class EventsGateway
                 }
             }
         }
-        this.removeParticipant(client, 'leave-room');
+        await this.removeParticipant(client, 'leave-room');
 
         const settings = this.roomSettings.get(data.roomId);
         const isHost = settings?.hostUserId === client.user.sub;
@@ -437,7 +467,7 @@ export class EventsGateway
         // If room has no settings yet OR if lobby is disabled OR if user is host/co-host → direct admit
         if (!settings || !settings.lobbyEnabled || isHost || isCoHost) {
             const role: ParticipantRole = isHost ? 'host' : isCoHost ? 'co-host' : 'participant';
-            this.admitParticipant(
+            await this.admitParticipant(
                 client.id,
                 client.user!.sub,
                 data.roomId,
@@ -577,7 +607,7 @@ export class EventsGateway
 
     /** Host approves a join request. */
     @SubscribeMessage('approve-request')
-    handleApproveRequest(
+    async handleApproveRequest(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: ApproveRequestPayload,
     ) {
@@ -592,7 +622,7 @@ export class EventsGateway
 
         // Admit the participant
         const role = data.role || 'participant';
-        this.admitParticipant(
+        await this.admitParticipant(
             data.targetSocketId,
             request.userId,
             data.roomId,
@@ -710,7 +740,7 @@ export class EventsGateway
     // ══════════════════════════════════════════════════════════════════════
 
     @SubscribeMessage('host-action')
-    handleHostAction(
+    async handleHostAction(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: HostActionPayload,
     ) {
@@ -786,7 +816,7 @@ export class EventsGateway
                         action: 'removed',
                         reason: 'You have been removed from this meeting by the host.',
                     });
-                    this.removeParticipant(targetSocket, 'leave-room');
+                    await this.removeParticipant(targetSocket, 'leave-room');
                 }
                 break;
             }
@@ -828,6 +858,27 @@ export class EventsGateway
                 this.server.to(data.roomId).emit('host-action-applied', {
                     action: 'unlock-room',
                 });
+                break;
+            }
+
+            case 'end-meeting': {
+                try {
+                    await this.meetingsService.endMeeting(data.roomId, client.user!.sub);
+                    this.server.to(data.roomId).emit('meeting-ended', {
+                        reason: 'The meeting has been ended by the host.',
+                    });
+                    
+                    // Disconnect all participants
+                    const sockets = await this.server.in(data.roomId).fetchSockets();
+                    for (const s of sockets) {
+                        await this.removeParticipant(s as any, 'leave-room');
+                        s.disconnect();
+                    }
+                    
+                    this.logDebug('meeting ended by host', { roomId: data.roomId, hostId: client.user!.sub });
+                } catch (e) {
+                    this.logDebug('end-meeting failed', { error: e.message });
+                }
                 break;
             }
 

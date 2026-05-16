@@ -5,6 +5,7 @@ import Entities from './Entities';
 
 const database = (configService: ConfigService): TypeOrmModuleOptions => {
   const databaseUrl = configService.get<string>('DATABASE_URL');
+  const caCert = configService.get<string>('POSTGRES_CA_CERT');
 
   if (databaseUrl) {
     return {
@@ -17,8 +18,16 @@ const database = (configService: ConfigService): TypeOrmModuleOptions => {
       dropSchema: false,
       migrationsRun: false,
       logging: false,
-      ssl: {
-        rejectUnauthorized: false,
+      ssl: caCert
+        ? {
+          rejectUnauthorized: true,
+          ca: caCert.replace(/\\n/g, '\n'),
+        }
+        : {
+          rejectUnauthorized: false,
+        },
+      extra: {
+        max: 4,
       },
     };
   }
@@ -31,15 +40,19 @@ const database = (configService: ConfigService): TypeOrmModuleOptions => {
     password: configService.get<string>('POSTGRES_PASSWORD'),
     database: configService.get<string>('POSTGRES_DATABASE'),
     // entities: [join(__dirname, '../**/*.entity.{ts,js}')],
-    entities: Entities,
+    entities: [join(__dirname, '../**/*.entity.{ts,js}')],
+    // entities: Entities,
     migrations: [join(__dirname, '../migrations/**/*.{ts,js}')],
-    synchronize: true,
-    ssl: false,
-
-    // dropSchema: false,
-    // migrationsRun: false,
-    // logging: false,
-    // ssl: false,
+    synchronize: false,
+    ssl: caCert
+      ? {
+        rejectUnauthorized: true,
+        ca: caCert.replace(/\\n/g, '\n'),
+      }
+      : false,
+    extra: {
+      max: 4,
+    },
   };
 };
 

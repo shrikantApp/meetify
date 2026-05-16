@@ -20,6 +20,19 @@ export class UsersService {
     }
 
     // Standard lookup by ID (no password field)
+    async updateStatus(id: string, isOnline: boolean, lastSeen?: Date): Promise<void> {
+        await this.usersRepository.update(id, { isOnline, lastSeen });
+    }
+
+    async searchUsers(query: string): Promise<User[]> {
+        return this.usersRepository
+            .createQueryBuilder('user')
+            .where('user.name ILIKE :q', { q: `%${query}%` })
+            .orWhere('user.email ILIKE :q', { q: `%${query}%` })
+            .limit(10)
+            .getMany();
+    }
+
     async findOne(id: string): Promise<User | null> {
         return this.usersRepository.findOne({ where: { id } });
     }
@@ -36,5 +49,18 @@ export class UsersService {
             .addSelect('user.password')
             .where('user.email = :email', { email })
             .getOne();
+    }
+
+    async searchByName(query: string, limit = 20): Promise<User[]> {
+        return this.usersRepository
+            .createQueryBuilder('user')
+            .where('user.name ILIKE :q OR user.email ILIKE :q', { q: `%${query}%` })
+            .take(limit)
+            .getMany();
+    }
+
+    async getUsersByIds(ids: string[]): Promise<User[]> {
+        if (!ids.length) return [];
+        return this.usersRepository.findByIds(ids);
     }
 }

@@ -22,6 +22,9 @@ export class Meeting {
     @Column()
     title: string;
 
+    @Column({ nullable: true })
+    description: string;
+
     @ManyToOne(() => User, (user) => user.hostedMeetings)
     @JoinColumn({ name: 'host_id' })
     host: User;
@@ -31,6 +34,9 @@ export class Meeting {
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
+
+    @Column({ name: 'ended_at', nullable: true })
+    endedAt: Date;
 
     @OneToMany(() => MeetingParticipant, (participant) => participant.meeting)
     participants: MeetingParticipant[];

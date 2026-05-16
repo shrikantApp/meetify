@@ -24,6 +24,15 @@ export class User {
   @Column({ name: 'password_hash', select: false }) // select: false ensures we don't accidentally leak it
   password: string;
 
+  @Column({ nullable: true })
+  avatarUrl: string;
+
+  @Column({ name: 'is_online', default: false })
+  isOnline: boolean;
+
+  @Column({ name: 'last_seen', nullable: true })
+  lastSeen: Date;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -10,6 +10,10 @@ import database from './config/database';
 import { configuration } from './config/configuration';
 import { validationSchema } from './config/validation';
 import { RecordingsModule } from './recordings/recordings.module';
+import { ChatModule } from './chat/chat.module';
+import { RedisModule } from './redis/redis.module';
+import { UploadsModule } from './uploads/uploads.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -18,7 +22,6 @@ dotenv.config();
     // Load environment variables globally
     ConfigModule.forRoot({
       isGlobal: true,
-      // envFilePath: process.env.NODE_ENV === "production" ? ".env.production" : ".env",
       envFilePath: [`${__dirname}/../../.env`, `${__dirname}/../.env`, '.env'],
       validationSchema: validationSchema,
       load: [configuration],
@@ -29,18 +32,6 @@ dotenv.config();
 
     // PostgreSQL connection via TypeORM using .env values
     TypeOrmModule.forRootAsync({
-      // imports: [ConfigModule],
-      // useFactory: (config: ConfigService) => ({
-      //   type: 'postgres',
-      //   host: config.get('POSTGRES_HOST'),
-      //   port: parseInt(config.get<string>('POSTGRES_PORT') ?? '5432', 10),
-      //   username: config.get('POSTGRES_USER'),
-      //   password: config.get('POSTGRES_PASSWORD'),
-      //   database: config.get('POSTGRES_DATABASE'),
-      //   entities: [User, Meeting, MeetingParticipant],
-      //   synchronize: true, // Auto-creates tables in dev. Use migrations in production.
-      // }),
-      // inject: [ConfigService],
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => database(configService),
       inject: [ConfigService],
@@ -51,6 +42,10 @@ dotenv.config();
     MeetingsModule,
     SignalingModule,
     RecordingsModule,
+    RedisModule,
+    ChatModule,
+    UploadsModule,
+    WorkspacesModule,
   ],
 })
 export class AppModule { }

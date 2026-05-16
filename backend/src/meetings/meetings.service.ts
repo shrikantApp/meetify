@@ -21,13 +21,38 @@ export class MeetingsService {
     }
 
     async createMeeting(dto: CreateMeetingDto, host: User): Promise<Meeting> {
+        let meetingCode = dto.meetingCode?.toUpperCase();
+
+        if (meetingCode) {
+            const existing = await this.meetingRepo.findOne({ where: { meetingCode } });
+            if (existing) {
+                // If provided code exists, fall back to generation or throw error.
+                // For now, let's generate a new one to be safe, but ideally we'd inform the user.
+                meetingCode = await this.generateUniqueCode();
+            }
+        } else {
+            meetingCode = await this.generateUniqueCode();
+        }
+
         const meeting = this.meetingRepo.create({
             title: dto.title,
-            meetingCode: this.generateCode(),
+            description: dto.description,
+            meetingCode,
             lobbyEnabled: dto.lobbyEnabled ?? true,
             host,
         });
         return this.meetingRepo.save(meeting);
+    }
+
+    private async generateUniqueCode(): Promise<string> {
+        let code = '';
+        let isUnique = false;
+        while (!isUnique) {
+            code = this.generateCode();
+            const existing = await this.meetingRepo.findOne({ where: { meetingCode: code } });
+            if (!existing) isUnique = true;
+        }
+        return code;
     }
 
     async updateMeeting(
@@ -76,6 +101,19 @@ export class MeetingsService {
     /** Called when a user leaves the meeting room */
     async recordLeave(participantId: string): Promise<void> {
         await this.participantRepo.update(participantId, { leftAt: new Date() });
+    }
+
+    async endMeeting(meetingCode: string, hostId: string): Promise<Meeting> {
+        const meeting = await this.meetingRepo.findOne({
+            where: { meetingCode },
+            relations: ['host'],
+        });
+        if (!meeting) throw new NotFoundException(`Meeting not found: ${meetingCode}`);
+        if (meeting.host.id !== hostId) {
+            throw new NotFoundException('Only the host may end this meeting');
+        }
+        meeting.endedAt = new Date();
+        return this.meetingRepo.save(meeting);
     }
 }
 

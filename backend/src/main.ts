@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { urlencoded, json } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
+import { RedisIoAdapter } from './redis/redis-io.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -38,6 +39,12 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Setup Redis Adapter for WebSocket horizontal scaling
+  // To enable horizontal scaling with Redis, uncomment the following lines when Redis is running:
+  // const redisIoAdapter = new RedisIoAdapter(app);
+  // app.useWebSocketAdapter(redisIoAdapter);
+
   await app.listen(port, "0.0.0.0");
 }
 void bootstrap();

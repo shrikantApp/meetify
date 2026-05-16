@@ -3,7 +3,17 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+const caCert = process.env.POSTGRES_CA_CERT;
 const isUrlConfig = !!process.env.DATABASE_URL;
+
+const sslConfig = caCert
+  ? {
+    rejectUnauthorized: true,
+    ca: caCert.replace(/\\n/g, "\n"),
+  }
+  : {
+    rejectUnauthorized: false,
+  };
 
 const AppDataSource = new DataSource(
   isUrlConfig
@@ -13,8 +23,10 @@ const AppDataSource = new DataSource(
       entities: ["src/**/*.entity.ts"],
       migrations: ["src/migrations/*.ts"],
       synchronize: false,
-      ssl: {
-        rejectUnauthorized: false,
+      ssl: sslConfig,
+      extra: {
+        max: 2,
+        connectTimeoutMS: 10000,
       },
     }
     : {
@@ -27,7 +39,11 @@ const AppDataSource = new DataSource(
       entities: ["src/**/*.entity.ts"],
       migrations: ["src/migrations/*.ts"],
       synchronize: false,
-      ssl: false,
+      ssl: sslConfig,
+      extra: {
+        max: 2,
+        connectTimeoutMS: 10000,
+      },
     }
 );
 

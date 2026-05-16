@@ -6,6 +6,14 @@ export class CreateMeetingDto {
     title: string;
 
     @IsOptional()
+    @IsString()
+    meetingCode?: string;
+
+    @IsOptional()
+    @IsString()
+    description?: string;
+
+    @IsOptional()
     @IsBoolean()
     lobbyEnabled?: boolean;
 }
