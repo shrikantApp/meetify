@@ -1,0 +1,131 @@
+.bubble {
+  position: relative;
+  display: flex;
+  width: 100%;
+  padding: 4px 20px;
+  transition: background-color 0.1s ease;
+}
+
+.bubble:hover {
+  background-color: var(--slack-hover);
+}
+
+.bubbleSameUser {
+  margin-top: 0;
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.bubbleWithAvatar {
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.avatarColumn {
+  flex-shrink: 0;
+  width: 36px;
+  margin-right: 12px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background-color: var(--slack-active);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.timestampHover {
+  width: 36px;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 4px;
+  font-size: 10px;
+  color: var(--slack-text-muted);
+  opacity: 0;
+  margin-top: 6px;
+}
+
+.bubble:hover .timestampHover {
+  opacity: 1;
+}
+
+.contentColumn {
+  flex: 1;
+  min-width: 0;
+}
+
+.messageHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.senderName {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--slack-text);
+  cursor: pointer;
+}
+
+.senderName:hover {
+  text-decoration: underline;
+}
+
+.timestamp {
+  font-size: 12px;
+  color: var(--slack-text-muted);
+  font-weight: 500;
+}
+
+.messageContent {
+  font-size: 15px;
+  line-height: 1.46668;
+  color: var(--slack-text);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  font-weight: 400;
+}
+
+.edited {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--slack-text-muted);
+}
+
+.actions {
+  position: absolute;
+  top: -12px;
+  right: 20px;
+  opacity: 0;
+  background-color: var(--slack-bg);
+  border: 1px solid var(--slack-border);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.bubble:hover .actions {
+  opacity: 1;
+}
+
+.actionBtn {
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--slack-text-muted);
+  transition: all 0.1s ease;
+}
+
+.actionBtn:hover {
+  background-color: var(--slack-hover);
+  color: var(--slack-text);
+}

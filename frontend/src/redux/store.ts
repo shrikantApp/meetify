@@ -13,10 +13,14 @@ import {
 import storage from 'redux-persist/lib/storage'; // localStorage
 
 import AuthReducer from './auth/authSlice';
+import chatReducer from './chat/chatSlice';
+import workspaceReducer from './workspace/workspaceSlice';
 
 // Combine reducers
 const rootReducer = combineReducers({
     auth: AuthReducer,
+    chat: chatReducer,
+    workspace: workspaceReducer,
 });
 
 // Persist config

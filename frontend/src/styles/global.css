@@ -1,0 +1,80 @@
+@charset "UTF-8";
+@import './theme.css';
+@import 'simplebar-react/dist/simplebar.min.css';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Overrides for Meetify */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--slack-bg);
+  color: var(--slack-text);
+}
+
+/* Slack-specific active state */
+.sidebar-item-active {
+  background-color: var(--slack-active) !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+}
+
+/* Custom Scrollbar for all areas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+/* Custom classes for professional feel */
+.text-slack-muted {
+  color: var(--slack-text-muted);
+}
+
+.bg-slack-hover {
+  background-color: var(--slack-hover);
+}
+
+.border-slack {
+  border-color: var(--slack-border);
+}
+
+/* Better buttons */
+.btn-primary {
+  background-color: var(--slack-accent);
+  color: white;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.btn-ghost {
+  padding: 6px;
+  border-radius: 4px;
+  color: var(--slack-text-muted);
+  transition: all 0.2s ease;
+}
+
+.btn-ghost:hover {
+  background-color: var(--slack-hover);
+  color: var(--slack-text);
+}

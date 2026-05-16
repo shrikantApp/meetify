@@ -1,0 +1,100 @@
+/* Compact Chat Overrides */
+
+:root {
+  --top-nav-height: 48px;
+  --chat-header-height: 48px;
+  --workspace-sidebar-width: 64px;
+  --conversation-sidebar-width: 240px;
+}
+
+/* Global Scale Reduction */
+.compact-text {
+  font-size: 0.8125rem !important; /* ~13px */
+}
+
+.compact-text-xs {
+  font-size: 0.6875rem !important; /* ~11px */
+}
+
+/* Avatar Reductions */
+.avatar-xs {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.avatar-sm {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.avatar-md {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* Sidebar Scroll Fix */
+.sidebar-scrollable {
+  height: calc(100vh - var(--top-nav-height));
+  overflow-y: auto;
+}
+
+/* Message List Alignment Fix */
+.message-list-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Welcome Section Reduction */
+.welcome-section-compact h1 {
+  font-size: 1.5rem !important;
+}
+
+.welcome-section-compact p {
+  font-size: 0.8125rem !important;
+}
+
+.welcome-section-compact .icon-container {
+  width: 64px !important;
+  height: 64px !important;
+}
+
+/* Composer Reduction */
+.composer-compact {
+  padding: 0.75rem 1rem !important;
+}
+
+.composer-compact textarea {
+  font-size: 0.875rem !important;
+  min-height: 36px !important;
+}
+/* Scrollbar Styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Layout Helpers */
+.flex-1-min-0 {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+/* Ensure parents are constrained */
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}

@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Settings, Mic, Video, Speaker, Volume2, FlipHorizontal, Type, Maximize2, MousePointer2 } from 'lucide-react';
-import { useSettings } from '../contexts/SettingsContext';
-
+import { useSettings } from '../../../contexts/SettingsContext';
 interface DeviceSettingsModalProps {
     isOpen: boolean;
     onClose: () => void;

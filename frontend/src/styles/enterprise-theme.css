@@ -1,0 +1,94 @@
+/* 
+ * Enterprise Chat UI Theme (Inspired by Slack/Discord/Linear)
+ * Scoped under .chat-theme-root to avoid overriding dashboard styles
+ */
+
+ .chat-theme-root {
+  /* Colors - Mapped to ThemeProvider with Deep Dark Fallbacks */
+  --bg-base: var(--slack-bg, #0f1117);
+  --bg-sidebar: var(--slack-sidebar, #151922);
+  --bg-workspace: var(--slack-sidebar, #0f1117);
+  --bg-card: var(--slack-bg, #1b2130);
+  --bg-card-hover: rgba(255, 255, 255, 0.05);
+  --bg-input: var(--slack-bg, #1a1d27);
+  
+  --accent-primary: var(--slack-active, #7c5cff);
+  --accent-secondary: var(--slack-primary, #9c83ff);
+  --accent-gradient: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  
+  --text-primary: var(--slack-text, #f5f7fb);
+  --text-secondary: #9aa4b2; /* Using static for now to avoid low contrast */
+  --text-muted: #64748b;
+  
+  --border-subtle: var(--slack-border, rgba(255, 255, 255, 0.06));
+  --border-medium: var(--slack-border, rgba(255, 255, 255, 0.12));
+  
+  /* Compact Radius */
+  --radius-xl: 12px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
+  
+  --shadow-premium: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --glass-blur: blur(24px) saturate(150%);
+}
+
+.chat-theme-root {
+  font-family: 'Inter', 'Geist', 'SF Pro Display', system-ui, sans-serif;
+  color: var(--text-primary);
+  background-color: var(--bg-base);
+  font-size: 13px; /* Base font size */
+  line-height: 1.4;
+}
+
+/* Typography Utilities */
+.text-11 { font-size: 11px; line-height: 14px; }
+.text-12 { font-size: 12px; line-height: 16px; }
+.text-13 { font-size: 13px; line-height: 18px; }
+.text-14 { font-size: 14px; line-height: 20px; }
+.text-15 { font-size: 15px; line-height: 22px; }
+
+/* Thin Modern Scrollbar for Webkit */
+.chat-theme-root .custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.chat-theme-root .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-theme-root .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+.chat-theme-root .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Base styles for independent scroll areas */
+.chat-theme-root .scroll-area {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+}
+
+/* Hover and Animation Utilities */
+.chat-theme-root .smooth-transition {
+  transition: all 0.15s ease-in-out;
+}
+
+.chat-theme-root .hover-bg-subtle:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.chat-theme-root .hover-bg-medium:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Glassmorphism overrides */
+.chat-theme-root .glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-premium);
+}

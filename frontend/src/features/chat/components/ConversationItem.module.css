@@ -1,0 +1,63 @@
+.item {
+  padding: 4px 16px 4px 28px; /* Extra left padding for the hash/status */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.1s ease, color 0.1s ease;
+  position: relative;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  border-radius: 0;
+}
+
+.item:hover:not(.active) {
+  background-color: var(--slack-sidebar-hover);
+  color: white;
+}
+
+.active {
+  background-color: #1164A3 !important; /* Slack Active Blue */
+  color: white !important;
+}
+
+.active .name {
+  font-weight: 700;
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.unread {
+  font-weight: 700;
+  color: white;
+}
+
+.iconWrapper {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  opacity: 0.5;
+}
+
+.active .iconWrapper {
+  opacity: 1;
+}
+
+.badgeWrapper {
+  margin-left: auto;
+  padding-left: 8px;
+}

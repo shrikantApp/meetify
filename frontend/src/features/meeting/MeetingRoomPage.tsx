@@ -1,23 +1,23 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useSocket } from '../contexts/SocketContext';
-import { useWebRTC } from '../hooks/useWebRTC';
-import { useLobby } from '../hooks/useLobby';
-import { api } from '../services/api';
-import WaitingRoomView from '../components/WaitingRoomView';
-import HostLobbyPanel from '../components/HostLobbyPanel';
-import JoinRequestToast from '../components/JoinRequestToast';
-import HostControlsPanel from '../components/HostControlsPanel';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../contexts/SocketContext';
+import { useWebRTC } from '../../hooks/useWebRTC';
+import { useLobby } from '../../hooks/useLobby';
+import { api } from '../../services/api';
+import WaitingRoomView from './components/WaitingRoomView';
+import HostLobbyPanel from './components/HostLobbyPanel';
+import JoinRequestToast from './components/JoinRequestToast';
+import HostControlsPanel from './components/HostControlsPanel';
 import {
     Video, VideoOff, MicOff, Check, Info,
     Users, MessageSquare, X
 } from 'lucide-react';
-import MeetingControls from '../components/MeetingControls';
-import VideoTile from '../components/VideoTile';
-import DeviceSettingsModal from '../components/DeviceSettingsModal';
-import ParticipantControlModal from '../components/ParticipantControlModal';
-import { useRecording } from '../hooks/useRecording';
+import MeetingControls from './components/MeetingControls';
+import VideoTile from './components/VideoTile';
+import DeviceSettingsModal from './components/DeviceSettingsModal';
+import ParticipantControlModal from './components/ParticipantControlModal';
+import { useRecording } from '../../hooks/useRecording';
 
 interface ChatMessage {
     message: string;
@@ -184,7 +184,7 @@ export default function MeetingRoomPage() {
         // Remote Peers
         peers.forEach(p => {
             const state = peerMediaStates[p.socketId];
-            
+
             // Camera (Always exists as a participant entry)
             result.push({
                 id: p.socketId,
@@ -622,17 +622,16 @@ export default function MeetingRoomPage() {
                 <div className={`flex-1 flex flex-col relative transition-all duration-500 ease-in-out ${showSidebar ? 'mr-[380px]' : ''}`}>
                     {/* Video Grid / Spotlight Container */}
                     <div className="flex-1 min-h-0 relative flex p-4 gap-6">
-                        
+
                         {!isSpotlightMode ? (
                             /* GRID MODE: Standard responsive grid with all tiles */
                             <div className="flex-1 flex flex-wrap items-center justify-center gap-6 overflow-hidden content-center">
                                 {tiles.map((tile) => (
-                                    <div key={tile.id} className={`transition-all duration-700 ease-in-out flex items-center justify-center shrink min-h-0 ${
-                                        tiles.length === 1 ? 'w-full h-full max-w-3xl' :
+                                    <div key={tile.id} className={`transition-all duration-700 ease-in-out flex items-center justify-center shrink min-h-0 ${tiles.length === 1 ? 'w-full h-full max-w-3xl' :
                                         tiles.length === 2 ? 'w-[calc(50%-12px)] h-full max-h-[85%]' :
-                                        tiles.length <= 4 ? 'w-[calc(50%-12px)] h-[calc(50%-12px)]' :
-                                        'w-[calc(33.33%-16px)] h-[calc(33.33%-16px)]'
-                                    }`}>
+                                            tiles.length <= 4 ? 'w-[calc(50%-12px)] h-[calc(50%-12px)]' :
+                                                'w-[calc(33.33%-16px)] h-[calc(33.33%-16px)]'
+                                        }`}>
                                         <div className="w-full h-full max-h-full aspect-video flex items-center justify-center overflow-hidden rounded-2xl">
                                             <VideoTile
                                                 stream={tile.stream}
@@ -645,11 +644,11 @@ export default function MeetingRoomPage() {
                                                 isActiveSpeaker={activeSpeakerId === tile.socketId}
                                                 isPinned={manualPinId === tile.id}
                                                 onPin={() => handlePin(tile.id)}
-                                                onContextMenu={() => openParticipantModal({ 
-                                                    socketId: tile.socketId, 
-                                                    userName: tile.userName, 
-                                                    isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false), 
-                                                    isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false) 
+                                                onContextMenu={() => openParticipantModal({
+                                                    socketId: tile.socketId,
+                                                    userName: tile.userName,
+                                                    isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false),
+                                                    isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false)
                                                 })}
                                                 onClick={() => tile.socketId !== 'local' && openParticipantModal({
                                                     socketId: tile.socketId,
@@ -671,7 +670,7 @@ export default function MeetingRoomPage() {
                                         {(() => {
                                             const tile = tiles.find(t => t.id === spotlightTileId);
                                             if (!tile) return null;
-                                            
+
                                             // Check for PiP partner (camera of the same socketId if we are spotlighting screen)
                                             const pipTile = tile.type === 'screen' ? tiles.find(t => t.socketId === tile.socketId && t.type === 'camera') : null;
 
@@ -689,11 +688,11 @@ export default function MeetingRoomPage() {
                                                         isPinned={manualPinId === tile.id}
                                                         isSpotlight={true}
                                                         onPin={() => handlePin(tile.id)}
-                                                        onContextMenu={() => openParticipantModal({ 
-                                                            socketId: tile.socketId, 
-                                                            userName: tile.userName, 
-                                                            isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false), 
-                                                            isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false) 
+                                                        onContextMenu={() => openParticipantModal({
+                                                            socketId: tile.socketId,
+                                                            userName: tile.userName,
+                                                            isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false),
+                                                            isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false)
                                                         })}
                                                         onClick={() => tile.socketId !== 'local' && openParticipantModal({
                                                             socketId: tile.socketId,
@@ -702,7 +701,7 @@ export default function MeetingRoomPage() {
                                                             isCamOn: peerMediaStates[tile.socketId]?.camera ?? false
                                                         })}
                                                     />
-                                                    
+
                                                     {/* PiP Overlay */}
                                                     {pipTile && (pipTile.socketId === 'local' ? (isCamOn && tile.stream) : peerMediaStates[pipTile.socketId]?.camera) && (
                                                         <div className="absolute bottom-6 right-6 w-48 aspect-video rounded-2xl overflow-hidden border-2 border-accent/40 shadow-2xl z-40 transition-all hover:scale-105 group-hover:translate-x-0 group-hover:translate-y-0">
@@ -740,11 +739,11 @@ export default function MeetingRoomPage() {
                                                     isActiveSpeaker={activeSpeakerId === tile.socketId}
                                                     isPinned={manualPinId === tile.id}
                                                     onPin={() => handlePin(tile.id)}
-                                                    onContextMenu={() => openParticipantModal({ 
-                                                        socketId: tile.socketId, 
-                                                        userName: tile.userName, 
-                                                        isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false), 
-                                                        isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false) 
+                                                    onContextMenu={() => openParticipantModal({
+                                                        socketId: tile.socketId,
+                                                        userName: tile.userName,
+                                                        isMicOn: tile.socketId === 'local' ? isMicOn : (peerMediaStates[tile.socketId]?.mic ?? false),
+                                                        isCamOn: tile.socketId === 'local' ? isCamOn : (peerMediaStates[tile.socketId]?.camera ?? false)
                                                     })}
                                                     onClick={() => tile.socketId !== 'local' && openParticipantModal({
                                                         socketId: tile.socketId,

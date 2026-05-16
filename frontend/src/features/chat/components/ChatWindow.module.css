@@ -1,0 +1,70 @@
+.window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--slack-bg);
+  overflow: hidden;
+}
+
+.scrollArea {
+  flex: 1;
+  height: 100%;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+}
+
+.welcomeSection {
+  padding: 40px 20px 20px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--slack-border);
+}
+
+.welcomeTitle {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  color: var(--slack-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.welcomeText {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--slack-text-muted);
+  max-width: 48rem;
+  line-height: 1.46668;
+}
+
+.dateSeparator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0;
+  position: sticky;
+  top: 8px;
+  padding: 0 20px;
+  z-index: 10;
+}
+
+.dateLine {
+  flex: 1;
+  height: 1px;
+  background-color: var(--slack-border);
+}
+
+.dateText {
+  padding: 4px 12px;
+  border: 1px solid var(--slack-border);
+  border-radius: 20px;
+  background-color: var(--slack-bg);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slack-text);
+  z-index: 1;
+}

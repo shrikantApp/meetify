@@ -1,0 +1,56 @@
+.avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  overflow: visible;
+  background-color: var(--slack-active);
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+
+.placeholder {
+  color: white;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+/* Sizes */
+.xs { width: 20px; height: 20px; font-size: 9px; }
+.sm { width: 28px; height: 28px; font-size: 11px; }
+.md { width: 36px; height: 36px; font-size: 14px; }
+.lg { width: 48px; height: 48px; font-size: 18px; }
+.xl { width: 80px; height: 80px; font-size: 24px; }
+
+/* Status Indicators */
+.status {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--slack-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.online { background-color: #2BAC76; }
+.offline { background-color: #ABABAD; }
+.away { background-color: #EBB72D; }
+.busy { background-color: #E01E5A; }
+
+.xs .status { width: 8px; height: 8px; bottom: -1px; right: -1px; border-width: 1px; }
+.sm .status { width: 10px; height: 10px; bottom: -1px; right: -1px; border-width: 1.5px; }
+.xl .status { width: 18px; height: 18px; bottom: 2px; right: 2px; border-width: 3px; }
