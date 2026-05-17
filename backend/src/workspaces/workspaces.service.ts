@@ -178,7 +178,7 @@ export class WorkspacesService {
   async updateWorkspace(
     id: string,
     userId: string,
-    data: { name?: string; slug?: string },
+    data: { name?: string; slug?: string; avatarUrl?: string },
   ) {
     await this.assertAdmin(id, userId);
     const workspace = await this.workspacesRepository.findOne({
@@ -193,6 +193,7 @@ export class WorkspacesService {
       workspace.slug = data.slug;
     }
     if (data.name) workspace.name = data.name;
+    if (data.avatarUrl !== undefined) workspace.avatarUrl = data.avatarUrl || null;
     const saved = await this.workspacesRepository.save(workspace);
     await this.logActivity({
       workspaceId: id,

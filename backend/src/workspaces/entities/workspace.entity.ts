@@ -25,6 +25,9 @@ export class Workspace {
   @Column({ unique: true })
   slug!: string;
 
+  @Column({ nullable: true })
+  avatarUrl!: string | null;
+
   @Column()
   ownerId!: string;
 

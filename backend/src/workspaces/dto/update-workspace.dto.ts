@@ -14,4 +14,9 @@ export class UpdateWorkspaceDto {
   @Length(2, 80)
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   slug?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  avatarUrl?: string;
 }
