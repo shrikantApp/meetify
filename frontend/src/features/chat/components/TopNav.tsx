@@ -1,6 +1,6 @@
-import React from 'react';
-import { Search, Bell, HelpCircle } from 'lucide-react';
+import { Search, HelpCircle } from 'lucide-react';
 import { useAppSelector } from '../../../redux/store';
+import { NotificationBell } from './NotificationBell';
 
 export const TopNav = () => {
   const currentUser = useAppSelector(state => state.auth.userProfile);
@@ -28,7 +28,7 @@ export const TopNav = () => {
 
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-0.5 border-r border-[var(--border-subtle)] pr-2 mr-1">
-          <NavAction icon={<Bell className="w-4 h-4" />} label="Notifications" badge />
+          <NotificationBell />
         </div>
 
         {/* User Profile */}
@@ -48,10 +48,3 @@ export const TopNav = () => {
     </nav>
   );
 };
-
-const NavAction = ({ icon, label, badge }: { icon: React.ReactNode, label: string, badge?: boolean }) => (
-  <button className="relative p-2 hover:bg-white/10 rounded-lg transition-colors text-[var(--text-secondary)] hover:text-white group" title={label}>
-    {icon}
-    {badge && <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-[var(--bg-base)]" />}
-  </button>
-);

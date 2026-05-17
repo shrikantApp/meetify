@@ -27,11 +27,6 @@ export function useMessageQueue() {
     }
   }, []);
 
-  const saveQueue = useCallback((newQueue: QueuedMessage[]) => {
-    setQueue(newQueue);
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(newQueue));
-  }, []);
-
   const enqueue = useCallback((msg: Omit<QueuedMessage, 'queuedAt' | 'retryCount'>) => {
     const newItem: QueuedMessage = { ...msg, queuedAt: Date.now(), retryCount: 0 };
     setQueue((prev) => {

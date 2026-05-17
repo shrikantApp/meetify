@@ -4,7 +4,7 @@ import { fetchMessages } from '../../../redux/chat/chatThunks';
 import { MessageBubble } from './MessageBubble';
 import { format, isSameDay, isBefore, subDays, subMonths } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, ChevronDown, ArrowUp, Clock } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 interface Props {
   conversationId: string;

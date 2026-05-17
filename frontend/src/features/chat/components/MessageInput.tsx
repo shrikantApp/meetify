@@ -55,7 +55,7 @@ export function MessageInput({
       Underline,
     ],
     content: initialContent,
-    onUpdate: ({ editor }) => {
+    onUpdate: () => {
       if (!isTyping) {
         setIsTyping(true);
         onTyping(true);
@@ -75,7 +75,7 @@ export function MessageInput({
   });
 
   // We need a ref for the send handler to use inside the editor's keydown handler without closure issues
-  const handleSendRef = useRef<() => void>();
+  const handleSendRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     handleSendRef.current = () => {
@@ -104,7 +104,7 @@ export function MessageInput({
           attributes: {
             class: 'focus:outline-none w-full bg-transparent text-[13px] md:text-sm p-2 min-h-[36px] max-h-[150px] overflow-y-auto leading-relaxed text-[var(--text-primary)] tiptap-editor',
           },
-          handleKeyDown: (view, event) => {
+          handleKeyDown: (_view, event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
               handleSendRef.current?.();

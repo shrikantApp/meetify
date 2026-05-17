@@ -3,6 +3,7 @@ import { Plus, Compass, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ThemeSelector } from './ThemeSelector';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
+import { WorkspaceSettingsPanel } from './WorkspaceSettingsPanel';
 import { useAppDispatch, useAppSelector } from '../../../redux/store';
 import { fetchWorkspaces } from '../../../redux/workspace/workspaceThunks';
 import { setActiveWorkspace } from '../../../redux/workspace/workspaceSlice';
@@ -10,6 +11,7 @@ import { setActiveWorkspace } from '../../../redux/workspace/workspaceSlice';
 export const WorkspaceSidebar = () => {
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const dispatch = useAppDispatch();
   const { workspaces, activeWorkspaceId } = useAppSelector(state => state.workspace);
 
@@ -43,13 +45,14 @@ export const WorkspaceSidebar = () => {
           ghost
           onClick={() => setIsCreateOpen(true)}
         />
-        <WorkspaceIcon icon={<Compass className="w-6 h-6" />} label="Explore" ghost />
+        <WorkspaceIcon icon={<Compass className="w-6 h-6" />} label="Themes" ghost onClick={() => setIsThemeOpen(true)} />
         <div className="w-8 h-[2px] bg-[var(--border-subtle)] rounded-full mx-auto flex-shrink-0" />
-        <WorkspaceIcon icon={<Settings className="w-6 h-6" />} label="Settings" ghost onClick={() => setIsThemeOpen(true)} />
+        <WorkspaceIcon icon={<Settings className="w-6 h-6" />} label="Workspace Settings" ghost onClick={() => setIsSettingsOpen(true)} />
       </div>
 
       <ThemeSelector isOpen={isThemeOpen} onClose={() => setIsThemeOpen(false)} />
       <CreateWorkspaceModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+      <WorkspaceSettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 };

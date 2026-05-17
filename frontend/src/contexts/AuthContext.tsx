@@ -2,8 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../services/api';
 import { selectCurrentUser, selectUserProfile, setCurrentUser, setUserProfile } from '../redux/auth/authSlice';
-import { useDispatch } from 'react-redux';
-import { useAppSelector } from '../redux/store';
+import { useAppDispatch, useAppSelector } from '../redux/store';
 
 interface User {
     id: string;
@@ -25,15 +24,19 @@ const AuthContext = createContext<AuthContextType>(null!);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const currentUser = useAppSelector(selectCurrentUser)
     const userProfile = useAppSelector(selectUserProfile)
-    const [token, setToken] = useState<string | null>(() => currentUser?.access_token);
+    const [token, setToken] = useState<string | null>(() => currentUser?.access_token || null);
     const [loading, setLoading] = useState(true);
-    const dispatch = useDispatch()
+    const dispatch = useAppDispatch()
     // On mount: if we have a stored token, fetch the user profile
     const callStoreUserProfile = (data: any) => {
         dispatch(setUserProfile(data))
     }
     useEffect(() => {
-        if (token) {
+        const persistedToken = currentUser?.access_token || null;
+
+        if (persistedToken) {
+            localStorage.setItem('meetify_token', persistedToken);
+            setToken(persistedToken);
             api.auth
                 .profile()
                 .then(callStoreUserProfile)
@@ -54,9 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const register = async (name: string, email: string, password: string) => {
-        const { access_token } = await api.auth.register({ name, email, password });
+        const { access_token, token_type } = await api.auth.register({ name, email, password });
         localStorage.setItem('meetify_token', access_token);
         setToken(access_token);
+        dispatch(setCurrentUser({ access_token, token_type }));
         const profile = await api.auth.profile();
         callStoreUserProfile(profile);
     };
@@ -64,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = () => {
         localStorage.removeItem('meetify_token');
         setToken(null);
+        dispatch(setCurrentUser({ access_token: '', token_type: '' }));
         callStoreUserProfile(null);
     };
 

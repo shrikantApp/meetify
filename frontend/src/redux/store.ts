@@ -15,19 +15,21 @@ import storage from 'redux-persist/lib/storage'; // localStorage
 import AuthReducer from './auth/authSlice';
 import chatReducer from './chat/chatSlice';
 import workspaceReducer from './workspace/workspaceSlice';
+import notificationReducer from './notifications/notificationSlice';
 
 // Combine reducers
 const rootReducer = combineReducers({
     auth: AuthReducer,
     chat: chatReducer,
     workspace: workspaceReducer,
+    notifications: notificationReducer,
 });
 
 // Persist config
 const persistConfig = {
     key: 'root',
     storage,
-    // whitelist: ['auth'], // only persist auth slice
+    whitelist: ['auth', 'workspace'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

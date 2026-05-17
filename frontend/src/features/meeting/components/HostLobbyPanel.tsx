@@ -15,7 +15,7 @@ import {
     VideoOff,
     ChevronDown,
 } from 'lucide-react';
-import type { PendingRequest, ParticipantRole } from '../hooks/useLobby';
+import type { PendingRequest, ParticipantRole } from '../../../hooks/useLobby';
 
 interface HostLobbyPanelProps {
     requests: PendingRequest[];

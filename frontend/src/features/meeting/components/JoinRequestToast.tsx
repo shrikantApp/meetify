@@ -1,10 +1,11 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // ── JoinRequestToast ─────────────────────────────────────────────────────────
 // A slide-in toast notification shown to the host when a new join request arrives.
 // Auto-dismisses after 10 seconds. Provides quick Approve / Deny actions.
 
 import { useEffect, useState } from 'react';
 import { UserCheck, UserX, Mic, MicOff, Video, VideoOff, X } from 'lucide-react';
-import type { PendingRequest, ParticipantRole } from '../hooks/useLobby';
+import type { PendingRequest, ParticipantRole } from '../../../hooks/useLobby';
 
 interface JoinRequestToastProps {
     request: PendingRequest | null;

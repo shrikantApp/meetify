@@ -28,6 +28,10 @@ export default function ChatPage() {
   const { conversationId } = useParams();
   const dispatch = useAppDispatch();
   const activeConv = useAppSelector(selectActiveConversation);
+  const activeWorkspaceId = useAppSelector((state) => state.workspace.activeWorkspaceId);
+  const hasActiveWorkspaceMembership = useAppSelector((state) =>
+    activeWorkspaceId ? state.workspace.workspaces.some((workspace) => workspace.id === activeWorkspaceId) : false,
+  );
   const currentUser = useAppSelector((state) => state.auth.userProfile);
   const [showDetails, setShowDetails] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -38,8 +42,9 @@ export default function ChatPage() {
   const { enqueue } = useMessageQueue();
 
   useEffect(() => {
-    dispatch(fetchConversations());
-  }, [dispatch]);
+    dispatch(fetchConversations(hasActiveWorkspaceMembership ? activeWorkspaceId ?? undefined : undefined));
+    dispatch(setActiveConversation(null));
+  }, [dispatch, activeWorkspaceId, hasActiveWorkspaceMembership]);
 
   useEffect(() => {
     if (conversationId) {
@@ -52,12 +57,6 @@ export default function ChatPage() {
       dispatch(setActiveConversation(null));
     }
   }, [conversationId, activeConv?.id, dispatch]);
-
-  const toggleSearch = () => {
-    setShowSearch(!showSearch);
-    setShowDetails(false);
-    setActiveThreadId(null);
-  };
 
   const toggleDetails = () => {
     setShowDetails(!showDetails);

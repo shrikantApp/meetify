@@ -1,10 +1,25 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { Workspace } from '../../services/workspaceApi';
-import { fetchWorkspaces, createWorkspace } from './workspaceThunks';
+import type { Workspace, WorkspaceInvitation, WorkspaceMember } from '../../services/workspaceApi';
+import {
+  acceptWorkspaceInvitation,
+  createWorkspace,
+  fetchMyWorkspaceInvitations,
+  fetchWorkspaceInvitations,
+  fetchWorkspaceMembers,
+  fetchWorkspaces,
+  inviteWorkspaceMember,
+  leaveWorkspace,
+  rejectWorkspaceInvitation,
+  removeWorkspaceMember,
+  updateWorkspaceMemberRole,
+} from './workspaceThunks';
 
 interface WorkspaceState {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
+  membersByWorkspace: Record<string, WorkspaceMember[]>;
+  invitationsByWorkspace: Record<string, WorkspaceInvitation[]>;
+  myInvitations: WorkspaceInvitation[];
   loading: boolean;
   error: string | null;
 }
@@ -12,6 +27,9 @@ interface WorkspaceState {
 const initialState: WorkspaceState = {
   workspaces: [],
   activeWorkspaceId: null,
+  membersByWorkspace: {},
+  invitationsByWorkspace: {},
+  myInvitations: [],
   loading: false,
   error: null,
 };
@@ -33,12 +51,18 @@ const workspaceSlice = createSlice({
       .addCase(fetchWorkspaces.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.membersByWorkspace ??= {};
+        state.invitationsByWorkspace ??= {};
+        state.myInvitations ??= [];
       })
       .addCase(fetchWorkspaces.fulfilled, (state, action: PayloadAction<Workspace[]>) => {
         state.loading = false;
         state.workspaces = action.payload;
-        if (action.payload.length > 0 && !state.activeWorkspaceId) {
+        const activeWorkspaceExists = action.payload.some((workspace) => workspace.id === state.activeWorkspaceId);
+        if (action.payload.length > 0 && (!state.activeWorkspaceId || !activeWorkspaceExists)) {
           state.activeWorkspaceId = action.payload[0].id;
+        } else if (action.payload.length === 0) {
+          state.activeWorkspaceId = null;
         }
       })
       .addCase(fetchWorkspaces.rejected, (state, action) => {
@@ -58,6 +82,49 @@ const workspaceSlice = createSlice({
       .addCase(createWorkspace.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      })
+      .addCase(fetchWorkspaceMembers.fulfilled, (state, action) => {
+        state.membersByWorkspace ??= {};
+        state.membersByWorkspace[action.payload.workspaceId] = action.payload.items;
+      })
+      .addCase(fetchWorkspaceInvitations.fulfilled, (state, action) => {
+        state.invitationsByWorkspace ??= {};
+        state.invitationsByWorkspace[action.payload.workspaceId] = action.payload.invitations;
+      })
+      .addCase(fetchMyWorkspaceInvitations.fulfilled, (state, action) => {
+        state.myInvitations = action.payload;
+      })
+      .addCase(inviteWorkspaceMember.fulfilled, (state, action) => {
+        state.invitationsByWorkspace ??= {};
+        const list = state.invitationsByWorkspace[action.payload.workspaceId] ?? [];
+        state.invitationsByWorkspace[action.payload.workspaceId] = [action.payload.invitation, ...list];
+      })
+      .addCase(acceptWorkspaceInvitation.fulfilled, (state, action) => {
+        state.myInvitations = state.myInvitations.filter((invite) => invite.id !== action.meta.arg);
+        if (action.payload.workspace && !state.workspaces.some((w) => w.id === action.payload.workspace.id)) {
+          state.workspaces.push(action.payload.workspace);
+        }
+        state.activeWorkspaceId = action.payload.workspace.id;
+      })
+      .addCase(rejectWorkspaceInvitation.fulfilled, (state, action) => {
+        state.myInvitations = state.myInvitations.filter((invite) => invite.id !== action.payload.id);
+      })
+      .addCase(updateWorkspaceMemberRole.fulfilled, (state, action) => {
+        state.membersByWorkspace ??= {};
+        const members = state.membersByWorkspace[action.payload.workspaceId] ?? [];
+        const idx = members.findIndex((member) => member.userId === action.payload.member.userId);
+        if (idx >= 0) members[idx] = action.payload.member;
+      })
+      .addCase(removeWorkspaceMember.fulfilled, (state, action) => {
+        state.membersByWorkspace ??= {};
+        state.membersByWorkspace[action.payload.workspaceId] = (state.membersByWorkspace[action.payload.workspaceId] ?? [])
+          .filter((member) => member.userId !== action.payload.userId);
+      })
+      .addCase(leaveWorkspace.fulfilled, (state, action) => {
+        state.workspaces = state.workspaces.filter((workspace) => workspace.id !== action.payload);
+        if (state.activeWorkspaceId === action.payload) {
+          state.activeWorkspaceId = state.workspaces[0]?.id ?? null;
+        }
       });
   },
 });

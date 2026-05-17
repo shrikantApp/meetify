@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Video, VideoOff, UserCheck, XCircle, Clock, Loader2 } from 'lucide-react';
-import type { LobbyStatus, MediaState } from '../hooks/useLobby';
+import type { LobbyStatus, MediaState } from '../../../hooks/useLobby';
 
 interface WaitingRoomViewProps {
     meetingTitle: string;

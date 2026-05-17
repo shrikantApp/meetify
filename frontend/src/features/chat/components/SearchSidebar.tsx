@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search as SearchIcon, X, Calendar, User, MessageSquare } from 'lucide-react';
+import { Search as SearchIcon, Calendar, User, MessageSquare } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../redux/store';
 import { searchMessages } from '../../../redux/chat/chatThunks';
 import { format } from 'date-fns';

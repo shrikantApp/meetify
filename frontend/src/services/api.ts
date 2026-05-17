@@ -1,7 +1,23 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 function getToken() {
-    return localStorage.getItem('meetify_token');
+    const token = localStorage.getItem('meetify_token');
+    if (token) {
+        return token;
+    }
+
+    const persistedRoot = localStorage.getItem('persist:root');
+    if (!persistedRoot) {
+        return null;
+    }
+
+    try {
+        const rootState = JSON.parse(persistedRoot);
+        const authState = JSON.parse(rootState.auth);
+        return authState?.currentUser?.access_token || null;
+    } catch {
+        return null;
+    }
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

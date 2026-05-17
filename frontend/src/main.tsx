@@ -6,13 +6,16 @@ import { SocketProvider } from './contexts/SocketContext';
 import './styles/global.css';
 import './index.css';
 import StoreProvider from './redux/StoreProvider';
+import { NotificationSocketProvider } from './contexts/NotificationSocketContext';
 
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
     <StoreProvider>
       <AuthProvider>
         <SocketProvider>
-          <App />
+          <NotificationSocketProvider>
+            <App />
+          </NotificationSocketProvider>
         </SocketProvider>
       </AuthProvider>
     </StoreProvider>

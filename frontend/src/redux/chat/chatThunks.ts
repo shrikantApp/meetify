@@ -2,9 +2,9 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import type { Conversation, Message } from './chatSlice';
 import { chatApi } from '../../services/chatApi';
 
-export const fetchConversations = createAsyncThunk<Conversation[]>(
+export const fetchConversations = createAsyncThunk<Conversation[], string | undefined>(
   'chat/fetchConversations',
-  async () => chatApi.getConversations(),
+  async (workspaceId) => chatApi.getConversations(workspaceId),
 );
 
 export const fetchMessages = createAsyncThunk<

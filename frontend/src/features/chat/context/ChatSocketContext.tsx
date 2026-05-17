@@ -44,6 +44,12 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => { activeConvIdRef.current = activeConversationId; }, [activeConversationId]);
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
 
+  useEffect(() => {
+    if (socketRef.current?.connected && activeConversationId) {
+      socketRef.current.emit('join_conversation', { conversationId: activeConversationId });
+    }
+  }, [activeConversationId, isConnected]);
+
   // Auto-mark as read when conversation becomes active
   useEffect(() => {
     if (socketRef.current?.connected && activeConversationId && currentUser) {
@@ -63,7 +69,15 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [activeConversationId, dispatch, currentUser, allMessages]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !currentUser?.id) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      setIsConnected(false);
+      dispatch(setSocketStatus('disconnected'));
+      return;
+    }
 
     if (socketRef.current) return; // Prevent multiple connections
 
@@ -99,8 +113,8 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     });
 
-    socket.on('message_sent', ({ tempId, messageId }) => {
-      dispatch(confirmMessage({ tempId, messageId, conversationId: '' }));
+    socket.on('message_sent', ({ tempId, messageId, conversationId }) => {
+      dispatch(confirmMessage({ tempId, messageId, conversationId }));
       dequeue(tempId);
     });
 
@@ -125,7 +139,7 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, dispatch]);
+  }, [token, currentUser?.id, dispatch]);
 
   const emit = (event: string, data: any) => {
     if (socketRef.current?.connected) {

@@ -12,8 +12,8 @@ http.interceptors.request.use((config) => {
 
 export const chatApi = {
   // Conversations
-  getConversations: () =>
-    http.get('/chat/conversations').then((r) => r.data),
+  getConversations: (workspaceId?: string) =>
+    http.get('/chat/conversations', { params: workspaceId ? { workspaceId } : undefined }).then((r) => r.data),
 
   getConversation: (id: string) =>
     http.get(`/chat/conversations/${id}`).then((r) => r.data),
