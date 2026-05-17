@@ -5,8 +5,8 @@ export class RecordChange1773474990699 implements MigrationInterface {
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "meeting_recordings" DROP CONSTRAINT "FK_fbaf68ef686a66017b8712de240"`);
-        await queryRunner.query(`CREATE TYPE "public"."meeting_recordings_status_enum" AS ENUM('IN_PROGRESS', 'PAUSED', 'COMPLETED', 'FAILED')`);
-        await queryRunner.query(`ALTER TABLE "meeting_recordings" ADD "status" "public"."meeting_recordings_status_enum" NOT NULL DEFAULT 'IN_PROGRESS'`);
+        await queryRunner.query(`DO $$ BEGIN CREATE TYPE "public"."meeting_recordings_status_enum" AS ENUM('IN_PROGRESS', 'PAUSED', 'COMPLETED', 'FAILED'); EXCEPTION WHEN duplicate_object THEN null; END $$;`);
+        await queryRunner.query(`ALTER TABLE "meeting_recordings" ADD COLUMN IF NOT EXISTS "status" "public"."meeting_recordings_status_enum" NOT NULL DEFAULT 'IN_PROGRESS'`);
         await queryRunner.query(`ALTER TABLE "meeting_recordings" ALTER COLUMN "file_path" DROP NOT NULL`);
         await queryRunner.query(`ALTER TABLE "meeting_recordings" ALTER COLUMN "file_size" DROP NOT NULL`);
         await queryRunner.query(`ALTER TABLE "meeting_recordings" ALTER COLUMN "duration" DROP NOT NULL`);
@@ -26,8 +26,8 @@ export class RecordChange1773474990699 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "meeting_recordings" ALTER COLUMN "duration" SET NOT NULL`);
         await queryRunner.query(`ALTER TABLE "meeting_recordings" ALTER COLUMN "file_size" SET NOT NULL`);
         await queryRunner.query(`ALTER TABLE "meeting_recordings" ALTER COLUMN "file_path" SET NOT NULL`);
-        await queryRunner.query(`ALTER TABLE "meeting_recordings" DROP COLUMN "status"`);
-        await queryRunner.query(`DROP TYPE "public"."meeting_recordings_status_enum"`);
+        await queryRunner.query(`ALTER TABLE "meeting_recordings" DROP COLUMN IF EXISTS "status"`);
+        await queryRunner.query(`DROP TYPE IF EXISTS "public"."meeting_recordings_status_enum"`);
         await queryRunner.query(`ALTER TABLE "meeting_recordings" ADD CONSTRAINT "FK_fbaf68ef686a66017b8712de240" FOREIGN KEY ("meeting_id") REFERENCES "meetings"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
     }
 

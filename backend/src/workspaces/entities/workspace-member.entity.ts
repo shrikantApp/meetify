@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, DeleteDateColumn, Index } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Workspace } from './workspace.entity';
 
@@ -10,6 +10,9 @@ export enum WorkspaceRole {
 }
 
 @Entity('workspace_members')
+@Index(['workspaceId', 'userId'], { unique: true })
+@Index(['userId'])
+@Index(['workspaceId', 'role'])
 export class WorkspaceMember {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -40,4 +43,7 @@ export class WorkspaceMember {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt: Date | null;
 }

@@ -44,6 +44,14 @@ export class PresenceService {
     }
   }
 
+  async getSocketIds(userId: string): Promise<string[]> {
+    try {
+      return await this.redis.smembers(SOCKET_MAP_KEY(userId));
+    } catch (e) {
+      return [];
+    }
+  }
+
   async getLastSeen(userId: string): Promise<Date | null> {
     try {
       const ts = await this.redis.get(LAST_SEEN_KEY(userId));

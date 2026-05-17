@@ -1,34 +1,51 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+  DeleteDateColumn,
+  Index,
+} from 'typeorm';
 import { WorkspaceMember } from './workspace-member.entity';
 import { Conversation } from '../../chat/entities/conversation.entity';
 import { User } from '../../users/entities/user.entity';
 @Entity('workspaces')
+@Index(['ownerId'])
 export class Workspace {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column()
-  name: string;
+  name!: string;
 
   @Column({ unique: true })
-  slug: string;
+  slug!: string;
 
   @Column()
-  ownerId: string;
+  ownerId!: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'ownerId' })
-  owner: User;
+  owner!: User;
 
-  @OneToMany(() => WorkspaceMember, member => member.workspace, { cascade: true })
-  members: WorkspaceMember[];
+  @OneToMany(() => WorkspaceMember, (member) => member.workspace, {
+    cascade: true,
+  })
+  members!: WorkspaceMember[];
 
-  @OneToMany(() => Conversation, conversation => conversation.workspace)
-  conversations: Conversation[];
+  @OneToMany(() => Conversation, (conversation) => conversation.workspace)
+  conversations!: Conversation[];
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
+
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
 }

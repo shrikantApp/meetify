@@ -14,6 +14,7 @@ import { ChatModule } from './chat/chat.module';
 import { RedisModule } from './redis/redis.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -46,6 +47,7 @@ dotenv.config();
     ChatModule,
     UploadsModule,
     WorkspacesModule,
+    NotificationsModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

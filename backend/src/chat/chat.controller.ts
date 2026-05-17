@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Controller,
   Get,
@@ -34,15 +37,28 @@ export class ChatController {
   // ── CONVERSATIONS ─────────────────────────────────────────────────────────
 
   @Get('conversations')
-  getConversations(@Request() req: any) {
-    return this.conversationsService.getUserConversations(req.user.id);
+  getConversations(
+    @Request() req: any,
+    @Query('workspaceId') workspaceId?: string,
+  ) {
+    return this.conversationsService.getUserConversations(
+      req?.user?.id,
+      workspaceId,
+    );
   }
 
   @Post('conversations')
-  async createConversation(@Request() req: any, @Body() dto: CreateConversationDto) {
+  async createConversation(
+    @Request() req: any,
+    @Body() dto: CreateConversationDto,
+  ) {
     const userId = req.user.id;
     if (dto.type === ConversationType.DIRECT && dto.targetUserId) {
-      return this.conversationsService.findOrCreateDirect(userId, dto.targetUserId, dto.workspaceId);
+      return this.conversationsService.findOrCreateDirect(
+        userId,
+        dto.targetUserId,
+        dto.workspaceId,
+      );
     }
     return this.conversationsService.createGroup(userId, dto);
   }
@@ -58,7 +74,9 @@ export class ChatController {
     @Request() req: any,
     @Body() body: { isMuted: boolean },
   ) {
-    return this.conversationsService.updateMemberSettings(id, req.user.id, { isMuted: body.isMuted });
+    return this.conversationsService.updateMemberSettings(id, req.user.id, {
+      isMuted: body.isMuted,
+    });
   }
 
   @Patch('conversations/:id/archive')
@@ -67,7 +85,9 @@ export class ChatController {
     @Request() req: any,
     @Body() body: { isArchived: boolean },
   ) {
-    return this.conversationsService.updateMemberSettings(id, req.user.id, { isArchived: body.isArchived });
+    return this.conversationsService.updateMemberSettings(id, req.user.id, {
+      isArchived: body.isArchived,
+    });
   }
 
   @Post('conversations/:id/members')
@@ -105,7 +125,10 @@ export class ChatController {
     @Body() dto: SendMessageDto,
     @Request() req: any,
   ) {
-    return this.messagesService.sendMessage(req.user.id, { ...dto, conversationId: id });
+    return this.messagesService.sendMessage(req.user.id, {
+      ...dto,
+      conversationId: id,
+    });
   }
 
   @Patch('messages/:id')
@@ -123,7 +146,11 @@ export class ChatController {
     @Query('forEveryone') forEveryone: string,
     @Request() req: any,
   ) {
-    return this.messagesService.deleteMessage(id, req.user.id, forEveryone === 'true');
+    return this.messagesService.deleteMessage(
+      id,
+      req.user.id,
+      forEveryone === 'true',
+    );
   }
 
   @Post('messages/:id/read')

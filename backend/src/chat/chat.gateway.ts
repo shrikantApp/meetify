@@ -92,6 +92,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const isMember = await this.conversationsService.isMember(body.conversationId, authClient.userId);
     if (!isMember) return client.emit('error', { event: 'send_message', message: 'Not a member' });
+    await client.join(`conv:${body.conversationId}`);
 
     const message = await this.messagesService.sendMessage(authClient.userId, {
       conversationId: body.conversationId,
@@ -105,10 +106,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Attach tempId for optimistic UI replacement on sender side
     (message as any).tempId = body.tempId;
 
-    this.server.to(`conv:${body.conversationId}`).emit('receive_message', message);
-    client.emit('message_sent', { tempId: body.tempId, messageId: message.id });
-
     const memberIds = await this.conversationsService.getMemberIds(body.conversationId);
+    await this.ensureOnlineMembersJoined(body.conversationId, memberIds);
+
+    this.server.to(`conv:${body.conversationId}`).emit('receive_message', message);
+    client.emit('message_sent', { tempId: body.tempId, messageId: message.id, conversationId: body.conversationId });
+
     const deliveredTo: string[] = [];
     for (const uid of memberIds) {
       if (uid === authClient.userId) continue;
@@ -126,6 +129,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         deliveredTo,
       });
     }
+  }
+
+  private async ensureOnlineMembersJoined(conversationId: string, memberIds: string[]) {
+    await Promise.all(memberIds.map(async (userId) => {
+      const socketIds = await this.presenceService.getSocketIds(userId);
+      await Promise.all(socketIds.map(async (socketId) => {
+        const socket = this.server.sockets.sockets.get(socketId);
+        if (socket) await socket.join(`conv:${conversationId}`);
+      }));
+    }));
   }
 
   @SubscribeMessage('get_messages')

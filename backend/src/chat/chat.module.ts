@@ -15,6 +15,7 @@ import { MessageReaction } from './entities/message-reaction.entity';
 import { MessageAttachment } from './entities/message-attachment.entity';
 import { UsersModule } from '../users/users.module';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { WsJwtGuard } from './guards/ws-jwt.guard';
       inject: [ConfigService],
     }),
     UsersModule,
+    WorkspacesModule,
   ],
   controllers: [ChatController],
   providers: [
