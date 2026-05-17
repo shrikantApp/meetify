@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -13,6 +14,7 @@ export class UsersService {
     async create(data: { name: string; email: string; password: string }): Promise<User> {
         const user = this.usersRepository.create({
             name: data.name,
+            fullName: data.name,
             email: data.email,
             password: data.password,
         });
@@ -62,5 +64,32 @@ export class UsersService {
     async getUsersByIds(ids: string[]): Promise<User[]> {
         if (!ids.length) return [];
         return this.usersRepository.findByIds(ids);
+    }
+
+    async updateProfile(id: string, dto: UpdateProfileDto): Promise<User> {
+        const user = await this.findOne(id);
+        if (!user) {
+            throw new ConflictException('User not found');
+        }
+
+        if (dto.email && dto.email !== user.email) {
+            const existing = await this.findByEmail(dto.email);
+            if (existing && existing.id !== id) {
+                throw new ConflictException('Email already in use');
+            }
+        }
+
+        Object.assign(user, {
+            ...(dto.name !== undefined ? { name: dto.name } : {}),
+            ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+            ...(dto.email !== undefined ? { email: dto.email } : {}),
+            ...(dto.title !== undefined ? { title: dto.title } : {}),
+            ...(dto.designation !== undefined ? { designation: dto.designation } : {}),
+            ...(dto.phoneNumber !== undefined ? { phoneNumber: dto.phoneNumber } : {}),
+            ...(dto.dateOfBirth !== undefined ? { dateOfBirth: dto.dateOfBirth } : {}),
+            ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
+        });
+
+        return this.usersRepository.save(user);
     }
 }

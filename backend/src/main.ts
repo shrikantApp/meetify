@@ -15,6 +15,7 @@ async function bootstrap() {
   app.use(
     helmet({
       contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
   app.use(json({ limit: '50mb' }));
@@ -23,6 +24,9 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'public'));
   app.useStaticAssets(join(process.cwd(), 'recordings'), {
     prefix: '/api/recordings',
+  });
+  app.useStaticAssets(join(process.cwd(), 'storage'), {
+    prefix: '/api/storage',
   });
   app.use(urlencoded({ extended: true, limit: '50mb', parameterLimit: 50000 }));
   app.setGlobalPrefix('api');

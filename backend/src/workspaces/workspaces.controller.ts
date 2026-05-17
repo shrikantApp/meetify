@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { WorkspacesService } from './workspaces.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -31,7 +44,11 @@ export class WorkspacesController {
   }
 
   @Patch(':id')
-  update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateWorkspaceDto) {
+  update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkspaceDto,
+  ) {
     return this.workspacesService.updateWorkspace(id, req.user.id, dto);
   }
 
@@ -64,7 +81,12 @@ export class WorkspacesController {
     @Param('userId') userId: string,
     @Body() dto: UpdateWorkspaceMemberRoleDto,
   ) {
-    return this.workspacesService.updateMemberRole(id, userId, req.user.id, dto.role);
+    return this.workspacesService.updateMemberRole(
+      id,
+      userId,
+      req.user.id,
+      dto.role,
+    );
   }
 
   @Delete(':id/members/me')
@@ -73,17 +95,29 @@ export class WorkspacesController {
   }
 
   @Delete(':id/members/:userId')
-  removeMember(@Req() req: any, @Param('id') id: string, @Param('userId') userId: string) {
+  removeMember(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
     return this.workspacesService.removeMember(id, userId, req.user.id);
   }
 
   @Post(':id/invitations')
-  invite(@Req() req: any, @Param('id') id: string, @Body() dto: InviteWorkspaceMemberDto) {
+  invite(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: InviteWorkspaceMemberDto,
+  ) {
     return this.workspacesService.inviteMember(id, req.user.id, dto);
   }
 
   @Get(':id/invitations')
-  invitations(@Req() req: any, @Param('id') id: string, @Query('status') status?: WorkspaceInvitationStatus) {
+  invitations(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('status') status?: WorkspaceInvitationStatus,
+  ) {
     return this.workspacesService.listInvitations(id, req.user.id, status);
   }
 
@@ -93,7 +127,11 @@ export class WorkspacesController {
   }
 
   @Post(':id/join-requests')
-  createJoinRequest(@Req() req: any, @Param('id') id: string, @Body() dto: CreateJoinRequestDto) {
+  createJoinRequest(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: CreateJoinRequestDto,
+  ) {
     return this.workspacesService.createJoinRequest(id, req.user, dto.message);
   }
 
@@ -104,17 +142,36 @@ export class WorkspacesController {
     @Param('requestId') requestId: string,
     @Body('role') role?: WorkspaceRole,
   ) {
-    return this.workspacesService.approveJoinRequest(id, requestId, req.user.id, role);
+    return this.workspacesService.approveJoinRequest(
+      id,
+      requestId,
+      req.user.id,
+      role,
+    );
   }
 
   @Post(':id/join-requests/:requestId/reject')
-  rejectJoinRequest(@Req() req: any, @Param('id') id: string, @Param('requestId') requestId: string) {
+  rejectJoinRequest(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('requestId') requestId: string,
+  ) {
     return this.workspacesService.rejectJoinRequest(id, requestId, req.user.id);
   }
 
   @Get(':id/activity')
-  activity(@Req() req: any, @Param('id') id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.workspacesService.getActivity(id, req.user.id, page ? Number(page) : 1, limit ? Number(limit) : 30);
+  activity(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.workspacesService.getActivity(
+      id,
+      req.user.id,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 30,
+    );
   }
 }
 
@@ -125,7 +182,11 @@ export class MyWorkspaceInvitationsController {
 
   @Get()
   list(@Req() req: any, @Query('status') status?: WorkspaceInvitationStatus) {
-    return this.workspacesService.getMyInvitations(req.user.id, req.user.email, status);
+    return this.workspacesService.getMyInvitations(
+      req.user.id,
+      req.user.email,
+      status,
+    );
   }
 
   @Post(':invitationId/accept')

@@ -25,7 +25,7 @@ export class Workspace {
   @Column({ unique: true })
   slug!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   avatarUrl!: string | null;
 
   @Column()
