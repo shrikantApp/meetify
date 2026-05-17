@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Compass, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { ThemeSelector } from './ThemeSelector';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
-import { WorkspaceSettingsPanel } from './WorkspaceSettingsPanel';
+import { PreferencesModal } from './PreferencesModal';
 import { useAppDispatch, useAppSelector } from '../../../redux/store';
 import { fetchWorkspaces } from '../../../redux/workspace/workspaceThunks';
 import { setActiveWorkspace } from '../../../redux/workspace/workspaceSlice';
 
 export const WorkspaceSidebar = () => {
-  const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const [preferencesSection, setPreferencesSection] = useState<'appearance' | 'workspace'>('appearance');
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const dispatch = useAppDispatch();
   const { workspaces, activeWorkspaceId } = useAppSelector(state => state.workspace);
 
@@ -20,8 +19,8 @@ export const WorkspaceSidebar = () => {
   }, [dispatch]);
 
   return (
-    <div className="w-[70px] flex-shrink-0 h-full bg-[var(--bg-workspace)] border-r border-white/10 flex flex-col items-center py-4 z-50 shadow-2xl relative">
-      <div className="flex-1 flex flex-col items-center gap-4 overflow-y-auto custom-scrollbar w-full">
+    <div className="w-[var(--workspace-sidebar-width)] flex-shrink-0 h-full bg-[var(--bg-workspace)] border-r border-white/10 flex flex-col items-center py-4 z-50 shadow-2xl relative overflow-visible">
+      <div className="flex-1 flex flex-col items-center gap-4 overflow-y-auto custom-scrollbar w-full px-2">
         {/* All Workspaces */}
         {workspaces.map((workspace) => (
           <WorkspaceIcon
@@ -38,21 +37,40 @@ export const WorkspaceSidebar = () => {
         )}
       </div>
 
-      <div className="mt-auto flex flex-col items-center gap-4 pt-4 border-t border-white/10 w-full">
+      <div className="mt-auto flex flex-col items-center gap-4 pt-4 border-t border-white/10 w-full px-2">
         <WorkspaceIcon
           icon={<Plus className="w-6 h-6" />}
           label="Add Workspace"
           ghost
           onClick={() => setIsCreateOpen(true)}
         />
-        <WorkspaceIcon icon={<Compass className="w-6 h-6" />} label="Themes" ghost onClick={() => setIsThemeOpen(true)} />
+        <WorkspaceIcon
+          icon={<Compass className="w-6 h-6" />}
+          label="Themes"
+          ghost
+          onClick={() => {
+            setPreferencesSection('appearance');
+            setIsPreferencesOpen(true);
+          }}
+        />
         <div className="w-8 h-[2px] bg-[var(--border-subtle)] rounded-full mx-auto flex-shrink-0" />
-        <WorkspaceIcon icon={<Settings className="w-6 h-6" />} label="Workspace Settings" ghost onClick={() => setIsSettingsOpen(true)} />
+        <WorkspaceIcon
+          icon={<Settings className="w-6 h-6" />}
+          label="Workspace Settings"
+          ghost
+          onClick={() => {
+            setPreferencesSection('workspace');
+            setIsPreferencesOpen(true);
+          }}
+        />
       </div>
 
-      <ThemeSelector isOpen={isThemeOpen} onClose={() => setIsThemeOpen(false)} />
+      <PreferencesModal
+        isOpen={isPreferencesOpen}
+        initialSection={preferencesSection}
+        onClose={() => setIsPreferencesOpen(false)}
+      />
       <CreateWorkspaceModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
-      <WorkspaceSettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 };
@@ -69,12 +87,12 @@ interface WorkspaceIconProps {
 
 const WorkspaceIcon = ({ icon, label, initials, active, color, ghost, onClick }: WorkspaceIconProps) => {
   return (
-    <div className="relative group cursor-pointer flex items-center" onClick={onClick}>
+    <div className="relative group cursor-pointer flex items-center justify-center w-full overflow-visible" onClick={onClick}>
       {/* Active Indicator */}
       {active && (
         <motion.div
           layoutId="active-workspace"
-          className="absolute -left-[15px] -translate-y-1/2 w-[3px] h-8 bg-white rounded-r-full"
+          className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-[3px] h-8 bg-white rounded-r-full"
         />
       )}
 

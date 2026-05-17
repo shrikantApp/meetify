@@ -27,6 +27,16 @@ export const createDirectConversation = createAsyncThunk<Conversation, { targetU
   async ({ targetUserId, workspaceId }) => chatApi.createConversation({ type: 'direct', targetUserId, workspaceId }),
 );
 
+export const acceptConversationRequest = createAsyncThunk<Conversation, string>(
+  'chat/acceptConversationRequest',
+  async (conversationId) => chatApi.acceptConversationRequest(conversationId),
+);
+
+export const rejectConversationRequest = createAsyncThunk<Conversation, string>(
+  'chat/rejectConversationRequest',
+  async (conversationId) => chatApi.rejectConversationRequest(conversationId),
+);
+
 export const createGroupConversation = createAsyncThunk<
   Conversation,
   { name: string; memberIds: string[]; description?: string; workspaceId?: string }

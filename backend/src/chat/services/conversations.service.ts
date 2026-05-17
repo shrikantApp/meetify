@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   Conversation,
+  ConversationConfirmationStatus,
   ConversationType,
 } from '../entities/conversation.entity';
 import {
@@ -18,6 +19,8 @@ import {
 import { UsersService } from '../../users/users.service';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WorkspacesService } from '../../workspaces/workspaces.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationType } from '../../notifications/entities/notification.entity';
 
 @Injectable()
 export class ConversationsService {
@@ -28,6 +31,7 @@ export class ConversationsService {
     private readonly memberRepo: Repository<ConversationMember>,
     private readonly usersService: UsersService,
     private readonly workspacesService: WorkspacesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /** Create or retrieve existing 1:1 direct conversation */
@@ -65,10 +69,13 @@ export class ConversationsService {
 
     if (existing) return existing;
 
+    const requester = await this.usersService.findOne(userId);
     const conv = this.convRepo.create({
       type: ConversationType.DIRECT,
       createdBy: userId,
       workspaceId,
+      requiresConfirmation: true,
+      confirmationStatus: ConversationConfirmationStatus.PENDING,
     });
     await this.convRepo.save(conv);
 
@@ -84,6 +91,21 @@ export class ConversationsService {
         role: MemberRole.MEMBER,
       }),
     ]);
+
+    await this.notificationsService.createNotification({
+      userId: targetUserId,
+      type: NotificationType.DIRECT_CHAT_REQUEST,
+      title: 'Direct chat request',
+      body: `${requester?.name || 'Someone'} wants to start a private chat with you.`,
+      referenceId: conv.id,
+      referenceType: 'conversation',
+      metadata: {
+        conversationId: conv.id,
+        workspaceId: workspaceId ?? null,
+        requesterId: userId,
+        requesterName: requester?.name ?? 'Unknown user',
+      },
+    });
 
     return this.getConversationById(conv.id, userId);
   }
@@ -119,6 +141,29 @@ export class ConversationsService {
       }),
     );
     await this.memberRepo.save(members);
+
+    const actor = await this.usersService.findOne(userId);
+    await Promise.all(
+      memberIds
+        .filter((memberId) => memberId !== userId)
+        .map((memberId) =>
+          this.notificationsService.createNotification({
+            userId: memberId,
+            type: NotificationType.GROUP_INVITE,
+            title: dto.name ? `Added to ${dto.name}` : 'Added to a group chat',
+            body: `${actor?.name || 'Someone'} added you to a group conversation.`,
+            referenceId: conv.id,
+            referenceType: 'conversation',
+            metadata: {
+              conversationId: conv.id,
+              workspaceId: dto.workspaceId ?? null,
+              createdBy: userId,
+              conversationName: dto.name ?? null,
+            },
+          }),
+        ),
+    );
+
     return this.getConversationById(conv.id, userId);
   }
 
@@ -147,6 +192,10 @@ export class ConversationsService {
       .andWhere(workspaceId ? 'c.workspaceId = :workspaceId' : '1=1', {
         workspaceId,
       })
+      .andWhere(
+        '(c.requiresConfirmation = false OR c.confirmationStatus = :accepted OR c.createdBy = :userId)',
+        { accepted: ConversationConfirmationStatus.ACCEPTED, userId },
+      )
       .orderBy('c.lastMessageAt', 'DESC', 'NULLS LAST')
       .addOrderBy('c.createdAt', 'DESC')
       .getMany();
@@ -173,7 +222,40 @@ export class ConversationsService {
     const isMember = conv.members.some((m) => m.userId === userId && !m.leftAt);
     if (!isMember)
       throw new ForbiddenException('Not a member of this conversation');
+    if (
+      conv.requiresConfirmation &&
+      conv.confirmationStatus !== ConversationConfirmationStatus.ACCEPTED &&
+      conv.createdBy !== userId
+    ) {
+      throw new ForbiddenException('Conversation request is still pending approval');
+    }
     return conv;
+  }
+
+  async respondToDirectRequest(
+    conversationId: string,
+    userId: string,
+    accept: boolean,
+  ): Promise<Conversation> {
+    const conv = await this.convRepo.findOne({
+      where: { id: conversationId, type: ConversationType.DIRECT },
+      relations: ['members', 'members.user'],
+    });
+    if (!conv) throw new NotFoundException('Conversation not found');
+
+    const isMember = conv.members.some((member) => member.userId === userId && !member.leftAt);
+    if (!isMember) throw new ForbiddenException('Not a member of this conversation');
+
+    if (!conv.requiresConfirmation) return conv;
+
+    conv.confirmationStatus = accept
+      ? ConversationConfirmationStatus.ACCEPTED
+      : ConversationConfirmationStatus.REJECTED;
+    conv.requiresConfirmation = !accept;
+    conv.isActive = accept;
+    await this.convRepo.save(conv);
+
+    return this.getConversationById(conv.id, conv.createdBy);
   }
 
   async addMember(

@@ -7,6 +7,8 @@ import {
   createDirectConversation,
   createGroupConversation,
   editMessage,
+  acceptConversationRequest,
+  rejectConversationRequest,
 } from './chatThunks';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -79,6 +81,8 @@ export interface Conversation {
   pinnedMessageId?: string;
   members?: ConversationMember[];
   workspaceId?: string;
+  requiresConfirmation?: boolean;
+  confirmationStatus?: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
   updatedAt: string;
   // Derived / UI state
@@ -222,6 +226,13 @@ const chatSlice = createSlice({
           msg.conversationId,
           ...state.conversationOrder.filter((id) => id !== msg.conversationId),
         ];
+      }
+    },
+
+    incrementConversationUnread(state, action: PayloadAction<{ conversationId: string }>) {
+      const conv = state.conversations[action.payload.conversationId];
+      if (conv) {
+        conv.unreadCount = (conv.unreadCount ?? 0) + 1;
       }
     },
 
@@ -392,6 +403,20 @@ const chatSlice = createSlice({
           state.conversationOrder.unshift(conv.id);
         }
       })
+      .addCase(acceptConversationRequest.fulfilled, (state, action) => {
+        const conv = action.payload;
+        state.conversations[conv.id] = { ...state.conversations[conv.id], ...conv };
+        if (!state.conversationOrder.includes(conv.id)) {
+          state.conversationOrder.unshift(conv.id);
+        }
+      })
+      .addCase(rejectConversationRequest.fulfilled, (state, action) => {
+        const conv = action.payload;
+        if (state.conversations[conv.id]) {
+          state.conversations[conv.id] = { ...state.conversations[conv.id], ...conv };
+        }
+        state.conversationOrder = state.conversationOrder.filter((id) => id !== conv.id);
+      })
 
       // Edit Message
       .addCase(editMessage.fulfilled, (state, action) => {
@@ -419,6 +444,7 @@ export const {
   setMessages,
   prependMessages,
   addMessage,
+  incrementConversationUnread,
   addOptimisticMessage,
   confirmMessage,
   failMessage,

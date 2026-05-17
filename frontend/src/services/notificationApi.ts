@@ -43,4 +43,12 @@ export const notificationApi = {
     const response = await http.patch(`/notifications/${id}/unread`);
     return response.data as NotificationItem;
   },
+  acceptConversationRequest: async (conversationId: string) => {
+    const response = await http.post(`/chat/conversations/${conversationId}/accept`);
+    return response.data;
+  },
+  rejectConversationRequest: async (conversationId: string) => {
+    const response = await http.post(`/chat/conversations/${conversationId}/reject`);
+    return response.data;
+  },
 };

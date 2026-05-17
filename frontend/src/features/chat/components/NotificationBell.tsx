@@ -1,12 +1,23 @@
 import { Bell, CheckCheck, Inbox, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../redux/store';
-import { fetchNotifications, markNotificationsRead } from '../../../redux/notifications/notificationThunks';
+import {
+  acceptDirectChatRequest,
+  fetchNotifications,
+  markNotificationsRead,
+  rejectDirectChatRequest,
+} from '../../../redux/notifications/notificationThunks';
 import { acceptWorkspaceInvitation, fetchMyWorkspaceInvitations, rejectWorkspaceInvitation } from '../../../redux/workspace/workspaceThunks';
+import { ConfirmationModal } from '../../../components/ui';
+import type { WorkspaceInvitation } from '../../../services/workspaceApi';
+import { useNavigate } from 'react-router-dom';
 
 export function NotificationBell() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [pendingInvite, setPendingInvite] = useState<WorkspaceInvitation | null>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
   const { items, unreadCount, loading } = useAppSelector((state) => state.notifications);
   const myInvitations = useAppSelector((state) => state.workspace.myInvitations);
 
@@ -16,6 +27,17 @@ export function NotificationBell() {
   }, [dispatch]);
 
   const handleOpen = () => setOpen((value) => !value);
+  const handleAcceptInvite = async () => {
+    if (!pendingInvite) return;
+    setIsAccepting(true);
+    try {
+      await dispatch(acceptWorkspaceInvitation(pendingInvite.id)).unwrap();
+      setPendingInvite(null);
+      setOpen(false);
+    } finally {
+      setIsAccepting(false);
+    }
+  };
 
   return (
     <div className="relative">
@@ -63,7 +85,7 @@ export function NotificationBell() {
                 <div className="flex gap-2 mt-3">
                   <button
                     className="px-3 py-1.5 rounded-lg premium-gradient text-white text-[11px] font-bold"
-                    onClick={() => dispatch(acceptWorkspaceInvitation(invite.id))}
+                    onClick={() => setPendingInvite(invite)}
                   >
                     Accept
                   </button>
@@ -84,25 +106,70 @@ export function NotificationBell() {
                 <p className="text-xs font-semibold">No notifications yet.</p>
               </div>
             )}
-            {items.map((item) => (
-              <button
-                key={item.id}
-                className={`w-full text-left p-3 border-b border-[var(--border-subtle)] hover:bg-white/5 transition-colors ${!item.isRead ? 'bg-white/[0.03]' : ''}`}
-                onClick={() => dispatch(markNotificationsRead([item.id]))}
-              >
-                <div className="flex gap-2">
-                  {!item.isRead && <span className="mt-1.5 w-2 h-2 rounded-full bg-rose-500 flex-shrink-0" />}
-                  <div>
-                    <p className="text-xs font-bold">{item.title}</p>
-                    {item.body && <p className="text-[11px] text-[var(--text-secondary)] mt-1 line-clamp-2">{item.body}</p>}
-                    <p className="text-[9px] text-[var(--text-muted)] mt-2">{new Date(item.createdAt).toLocaleString()}</p>
+            {items.map((item) => {
+              const isDirectChatRequest = item.type === 'direct_chat_request' && !!item.referenceId;
+              return (
+                <div
+                  key={item.id}
+                  className={`w-full text-left p-3 border-b border-[var(--border-subtle)] hover:bg-white/5 transition-colors ${!item.isRead ? 'bg-white/[0.03]' : ''}`}
+                >
+                  <div className="flex gap-2">
+                    {!item.isRead && <span className="mt-1.5 w-2 h-2 rounded-full bg-rose-500 flex-shrink-0" />}
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">{item.title}</p>
+                      {item.body && <p className="text-[11px] text-[var(--text-secondary)] mt-1 line-clamp-2">{item.body}</p>}
+                      <p className="text-[9px] text-[var(--text-muted)] mt-2">{new Date(item.createdAt).toLocaleString()}</p>
+                      {isDirectChatRequest ? (
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            className="px-3 py-1.5 rounded-lg premium-gradient text-white text-[11px] font-bold"
+                            onClick={async () => {
+                              const conversation = await dispatch(acceptDirectChatRequest(item.referenceId!)).unwrap();
+                              await dispatch(markNotificationsRead([item.id]));
+                              setOpen(false);
+                              navigate(`/chat/${conversation.id}`);
+                            }}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            className="px-3 py-1.5 rounded-lg bg-white/5 text-[11px] font-bold hover:bg-white/10"
+                            onClick={async () => {
+                              await dispatch(rejectDirectChatRequest(item.referenceId!)).unwrap();
+                              await dispatch(markNotificationsRead([item.id]));
+                            }}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="mt-3 text-[11px] font-bold text-[var(--accent-primary)]"
+                          onClick={() => dispatch(markNotificationsRead([item.id]))}
+                        >
+                          Mark read
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={!!pendingInvite}
+        title="Join workspace?"
+        description={`Do you want to join ${pendingInvite?.workspace?.name || 'this workspace'} as ${pendingInvite?.role || 'member'}?`}
+        confirmLabel="Join workspace"
+        cancelLabel="Not now"
+        tone="success"
+        isLoading={isAccepting}
+        onConfirm={handleAcceptInvite}
+        onCancel={() => !isAccepting && setPendingInvite(null)}
+      />
     </div>
   );
 }

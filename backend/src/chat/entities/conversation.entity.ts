@@ -18,51 +18,74 @@ export enum ConversationType {
   BROADCAST = 'broadcast',
 }
 
+export enum ConversationConfirmationStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  REJECTED = 'rejected',
+}
+
 @Entity('conversations')
 export class Conversation {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
-  @Column({ type: 'enum', enum: ConversationType, default: ConversationType.DIRECT })
-  type: ConversationType;
+  @Column({
+    type: 'enum',
+    enum: ConversationType,
+    default: ConversationType.DIRECT,
+  })
+  type!: ConversationType;
 
   @Column({ nullable: true })
-  name: string;
+  name!: string;
 
   @Column({ nullable: true })
-  description: string;
+  description!: string;
 
   @Column({ name: 'avatar_url', nullable: true })
-  avatarUrl: string;
+  avatarUrl!: string;
 
   @Column({ name: 'created_by', type: 'uuid' })
-  createdBy: string;
+  createdBy!: string;
 
   @Column({ name: 'is_active', default: true })
-  isActive: boolean;
+  isActive!: boolean;
+
+  @Column({ name: 'requires_confirmation', default: false })
+  requiresConfirmation!: boolean;
+
+  @Column({
+    name: 'confirmation_status',
+    type: 'enum',
+    enum: ConversationConfirmationStatus,
+    default: ConversationConfirmationStatus.ACCEPTED,
+  })
+  confirmationStatus!: ConversationConfirmationStatus;
 
   @Column({ name: 'last_message_at', nullable: true, type: 'timestamptz' })
-  lastMessageAt: Date;
+  lastMessageAt!: Date;
 
   @Column({ name: 'pinned_message_id', nullable: true, type: 'uuid' })
-  pinnedMessageId: string;
+  pinnedMessageId!: string;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @OneToMany(() => ConversationMember, (m) => m.conversation, { cascade: true })
-  members: ConversationMember[];
+  members!: ConversationMember[];
 
   @OneToMany(() => Message, (m) => m.conversation)
-  messages: Message[];
+  messages!: Message[];
 
   @Column({ nullable: true, type: 'uuid' })
-  workspaceId: string;
+  workspaceId!: string;
 
-  @ManyToOne(() => Workspace, workspace => workspace.conversations, { nullable: true })
+  @ManyToOne(() => Workspace, (workspace) => workspace.conversations, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace!: Workspace;
 }

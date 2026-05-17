@@ -31,6 +31,39 @@ export const createWorkspace = createAsyncThunk(
   },
 );
 
+export const updateWorkspaceDetails = createAsyncThunk(
+  "workspace/updateWorkspace",
+  async (
+    payload: { workspaceId: string; name?: string; slug?: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await workspaceApi.updateWorkspace(payload.workspaceId, {
+        name: payload.name,
+        slug: payload.slug,
+      });
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to update workspace",
+      );
+    }
+  },
+);
+
+export const deleteWorkspace = createAsyncThunk(
+  "workspace/deleteWorkspace",
+  async (workspaceId: string, { rejectWithValue }) => {
+    try {
+      await workspaceApi.deleteWorkspace(workspaceId);
+      return workspaceId;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to delete workspace",
+      );
+    }
+  },
+);
+
 export const fetchWorkspaceMembers = createAsyncThunk(
   "workspace/fetchMembers",
   async (workspaceId: string, { rejectWithValue }) => {

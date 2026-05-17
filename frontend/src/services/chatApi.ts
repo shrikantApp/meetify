@@ -28,6 +28,12 @@ export const chatApi = {
     workspaceId?: string;
   }) => http.post('/chat/conversations', body).then((r) => r.data),
 
+  acceptConversationRequest: (id: string) =>
+    http.post(`/chat/conversations/${id}/accept`).then((r) => r.data),
+
+  rejectConversationRequest: (id: string) =>
+    http.post(`/chat/conversations/${id}/reject`).then((r) => r.data),
+
   muteConversation: (id: string, isMuted: boolean) =>
     http.patch(`/chat/conversations/${id}/mute`, { isMuted }).then((r) => r.data),
 

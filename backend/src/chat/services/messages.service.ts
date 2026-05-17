@@ -5,7 +5,10 @@ import { Message, MessageDeliveryStatus, MessageType } from '../entities/message
 import { MessageStatus, StatusType } from '../entities/message-status.entity';
 import { MessageReaction } from '../entities/message-reaction.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
-import { Conversation } from '../entities/conversation.entity';
+import {
+  Conversation,
+  ConversationConfirmationStatus,
+} from '../entities/conversation.entity';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { GetMessagesDto } from '../dto/get-messages.dto';
 
@@ -25,6 +28,17 @@ export class MessagesService {
   ) {}
 
   async sendMessage(senderId: string, dto: SendMessageDto): Promise<Message> {
+    const conversation = await this.convRepo.findOne({
+      where: { id: dto.conversationId },
+    });
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    if (
+      conversation.requiresConfirmation &&
+      conversation.confirmationStatus !== ConversationConfirmationStatus.ACCEPTED
+    ) {
+      throw new ForbiddenException('Conversation request must be accepted before messaging');
+    }
+
     const msg = this.msgRepo.create({
       conversationId: dto.conversationId,
       senderId,

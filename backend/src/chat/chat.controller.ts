@@ -68,6 +68,22 @@ export class ChatController {
     return this.conversationsService.getConversationById(id, req.user.id);
   }
 
+  @Post('conversations/:id/accept')
+  acceptConversationRequest(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: any,
+  ) {
+    return this.conversationsService.respondToDirectRequest(id, req.user.id, true);
+  }
+
+  @Post('conversations/:id/reject')
+  rejectConversationRequest(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: any,
+  ) {
+    return this.conversationsService.respondToDirectRequest(id, req.user.id, false);
+  }
+
   @Patch('conversations/:id/mute')
   muteConversation(
     @Param('id', ParseUUIDPipe) id: string,

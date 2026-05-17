@@ -1,0 +1,115 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted, var(--slack-text-muted));
+}
+
+.optional {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary, var(--slack-text-muted));
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.controlWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.control {
+  width: 100%;
+  border: 1px solid var(--border-subtle, var(--slack-border));
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary, var(--slack-text));
+  border-radius: 0.85rem;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.92rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.control::placeholder {
+  color: var(--text-muted, var(--slack-text-muted));
+}
+
+.control:focus {
+  border-color: var(--accent-primary, var(--slack-active));
+  box-shadow: 0 0 0 4px rgba(17, 100, 163, 0.14);
+}
+
+.control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.select {
+  appearance: none;
+  padding-right: 2.75rem;
+}
+
+.hasStart {
+  padding-left: 2.9rem;
+}
+
+.hasEnd {
+  padding-right: 2.9rem;
+}
+
+.iconStart,
+.iconEnd,
+.selectIcon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted, var(--slack-text-muted));
+  pointer-events: none;
+}
+
+.iconStart {
+  left: 0.95rem;
+}
+
+.iconEnd,
+.selectIcon {
+  right: 0.95rem;
+}
+
+.helper {
+  font-size: 0.76rem;
+  color: var(--text-secondary, var(--slack-text-muted));
+  line-height: 1.4;
+}
+
+.error {
+  color: #fda4af;
+}
+
+.controlError {
+  border-color: rgba(225, 29, 72, 0.45);
+  box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.12);
+}

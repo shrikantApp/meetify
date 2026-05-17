@@ -3,6 +3,7 @@ import type { Workspace, WorkspaceInvitation, WorkspaceMember } from '../../serv
 import {
   acceptWorkspaceInvitation,
   createWorkspace,
+  deleteWorkspace,
   fetchMyWorkspaceInvitations,
   fetchWorkspaceInvitations,
   fetchWorkspaceMembers,
@@ -11,6 +12,7 @@ import {
   leaveWorkspace,
   rejectWorkspaceInvitation,
   removeWorkspaceMember,
+  updateWorkspaceDetails,
   updateWorkspaceMemberRole,
 } from './workspaceThunks';
 
@@ -83,6 +85,20 @@ const workspaceSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
+      .addCase(updateWorkspaceDetails.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateWorkspaceDetails.fulfilled, (state, action: PayloadAction<Workspace>) => {
+        state.loading = false;
+        state.workspaces = state.workspaces.map((workspace) =>
+          workspace.id === action.payload.id ? action.payload : workspace,
+        );
+      })
+      .addCase(updateWorkspaceDetails.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
       .addCase(fetchWorkspaceMembers.fulfilled, (state, action) => {
         state.membersByWorkspace ??= {};
         state.membersByWorkspace[action.payload.workspaceId] = action.payload.items;
@@ -125,6 +141,23 @@ const workspaceSlice = createSlice({
         if (state.activeWorkspaceId === action.payload) {
           state.activeWorkspaceId = state.workspaces[0]?.id ?? null;
         }
+      })
+      .addCase(deleteWorkspace.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteWorkspace.fulfilled, (state, action) => {
+        state.loading = false;
+        state.workspaces = state.workspaces.filter((workspace) => workspace.id !== action.payload);
+        delete state.membersByWorkspace[action.payload];
+        delete state.invitationsByWorkspace[action.payload];
+        if (state.activeWorkspaceId === action.payload) {
+          state.activeWorkspaceId = state.workspaces[0]?.id ?? null;
+        }
+      })
+      .addCase(deleteWorkspace.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   },
 });

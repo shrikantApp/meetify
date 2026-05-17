@@ -12,6 +12,7 @@ import { User } from '../../users/entities/user.entity';
 export enum NotificationType {
   NEW_MESSAGE = 'new_message',
   MENTION = 'mention',
+  DIRECT_CHAT_REQUEST = 'direct_chat_request',
   GROUP_INVITE = 'group_invite',
   WORKSPACE_INVITE = 'workspace_invite',
   WORKSPACE_JOIN_REQUEST = 'workspace_join_request',

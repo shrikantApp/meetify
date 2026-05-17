@@ -5,6 +5,7 @@ import { useMessageQueue } from '../../../hooks/useMessageQueue';
 import {
   setSocketStatus,
   addMessage,
+  incrementConversationUnread,
   confirmMessage,
   updateMessageStatus,
   markConversationRead,
@@ -110,6 +111,8 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (activeId === msg.conversationId && msg.senderId !== me?.id) {
         socket.emit('message_read', { conversationId: msg.conversationId, lastMessageId: msg.id });
         dispatch(markConversationRead({ conversationId: msg.conversationId, userId: me?.id || '' }));
+      } else if (msg.senderId !== me?.id) {
+        dispatch(incrementConversationUnread({ conversationId: msg.conversationId }));
       }
     });
 

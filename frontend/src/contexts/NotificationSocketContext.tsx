@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../redux/store';
 import { fetchNotifications, fetchUnreadCount } from '../redux/notifications/notificationThunks';
 import { markLocalRead, setUnreadCount, upsertNotification } from '../redux/notifications/notificationSlice';
 import type { NotificationItem } from '../services/notificationApi';
+import { fetchConversations } from '../redux/chat/chatThunks';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '/notifications')
@@ -18,6 +19,7 @@ export function NotificationSocketProvider({ children }: { children: React.React
   const dispatch = useAppDispatch();
   const token = useAppSelector((state) => state.auth.currentUser.access_token);
   const userId = useAppSelector((state) => state.auth.userProfile?.id);
+  const activeWorkspaceId = useAppSelector((state) => state.workspace.activeWorkspaceId);
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -40,7 +42,15 @@ export function NotificationSocketProvider({ children }: { children: React.React
       dispatch(fetchUnreadCount());
     });
     socket.on('disconnect', () => setIsConnected(false));
-    socket.on('notification.created', (notification: NotificationItem) => dispatch(upsertNotification(notification)));
+    socket.on('notification.created', (notification: NotificationItem) => {
+      dispatch(upsertNotification(notification));
+      if (
+        notification.type === 'group_invite' ||
+        notification.type === 'direct_chat_request'
+      ) {
+        dispatch(fetchConversations(activeWorkspaceId ?? undefined));
+      }
+    });
     socket.on('notification.read', (payload: { notificationIds?: string[]; all?: boolean }) => dispatch(markLocalRead(payload)));
     socket.on('notification.unread_count.updated', ({ count }: { count: number }) => dispatch(setUnreadCount(count)));
 
@@ -49,7 +59,7 @@ export function NotificationSocketProvider({ children }: { children: React.React
       socketRef.current = null;
       setIsConnected(false);
     };
-  }, [dispatch, token, userId]);
+  }, [activeWorkspaceId, dispatch, token, userId]);
 
   return (
     <NotificationSocketContext.Provider value={{ socket: socketRef.current, isConnected }}>

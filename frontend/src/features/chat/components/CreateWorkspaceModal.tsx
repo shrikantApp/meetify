@@ -3,6 +3,7 @@ import { X, Layout, Plus, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppDispatch, useAppSelector } from '../../../redux/store';
 import { createWorkspace } from '../../../redux/workspace/workspaceThunks';
+import { InputField } from '../../../components/ui/InputField';
 
 interface Props {
   isOpen: boolean;
@@ -59,22 +60,15 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider ml-1">
-                  Workspace Name
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Acme Corp, Engineering, Team Alpha"
-                  className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border-subtle)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] transition-all placeholder:text-[var(--text-muted)]/50"
-                />
-                <p className="text-[10px] text-[var(--text-muted)] ml-1">
-                  This will be the name of your new collaboration hub.
-                </p>
-              </div>
+              <InputField
+                label="Workspace Name"
+                type="text"
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Acme Corp, Engineering, Team Alpha"
+                hint="This will be the name of your new collaboration hub."
+              />
 
               {error && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">

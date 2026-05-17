@@ -18,6 +18,7 @@ export function CreateDirectChatModal({ isOpen, onClose }: Props) {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   
   const searchResults = useAppSelector(state => state.chat.userSearchResults);
   const currentUser = useAppSelector(state => state.auth.userProfile);
@@ -29,6 +30,7 @@ export function CreateDirectChatModal({ isOpen, onClose }: Props) {
       setSelectedUsers([]);
       setIsSubmitting(false);
       setIsSearching(false);
+      setStatusMessage('');
       dispatch(setUserSearchResults([]));
     }
   }, [isOpen, dispatch]);
@@ -60,8 +62,14 @@ export function CreateDirectChatModal({ isOpen, onClose }: Props) {
         workspaceId: activeWorkspaceId || undefined
       })).unwrap()
         .then(conv => {
-          navigate(`/chat/${conv.id}`);
-          onClose();
+          if (conv.requiresConfirmation && conv.confirmationStatus === 'pending') {
+            setStatusMessage('Chat request sent. The receiver needs to accept before the conversation becomes active.');
+            setSelectedUsers([]);
+            setQuery('');
+          } else {
+            navigate(`/chat/${conv.id}`);
+            onClose();
+          }
         })
         .finally(() => setIsSubmitting(false));
     } else {
@@ -182,6 +190,12 @@ export function CreateDirectChatModal({ isOpen, onClose }: Props) {
                 ))}
               </AnimatePresence>
             </div>
+
+            {statusMessage ? (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs font-medium text-emerald-300">
+                {statusMessage}
+              </div>
+            ) : null}
           </div>
 
           <div className="px-6 py-4 border-t border-[var(--border-subtle)] bg-white/5 flex justify-end gap-3">
@@ -203,7 +217,7 @@ export function CreateDirectChatModal({ isOpen, onClose }: Props) {
               ) : (
                 <UserPlus className="w-3.5 h-3.5" />
               )}
-              <span>{isSubmitting ? 'Starting...' : 'Start Chat'}</span>
+              <span>{isSubmitting ? 'Starting...' : selectedUsers.length === 1 ? 'Send Request' : 'Start Chat'}</span>
             </button>
           </div>
         </motion.div>

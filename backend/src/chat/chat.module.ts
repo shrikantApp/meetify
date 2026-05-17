@@ -16,6 +16,7 @@ import { MessageAttachment } from './entities/message-attachment.entity';
 import { UsersModule } from '../users/users.module';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     }),
     UsersModule,
     WorkspacesModule,
+    NotificationsModule,
   ],
   controllers: [ChatController],
   providers: [

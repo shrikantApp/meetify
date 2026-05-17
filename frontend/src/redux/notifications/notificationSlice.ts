@@ -1,6 +1,12 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { NotificationItem } from '../../services/notificationApi';
-import { fetchNotifications, fetchUnreadCount, markNotificationsRead } from './notificationThunks';
+import {
+  acceptDirectChatRequest,
+  fetchNotifications,
+  fetchUnreadCount,
+  markNotificationsRead,
+  rejectDirectChatRequest,
+} from './notificationThunks';
 
 interface NotificationsState {
   items: NotificationItem[];
@@ -59,6 +65,14 @@ const notificationSlice = createSlice({
       })
       .addCase(markNotificationsRead.fulfilled, (state, action) => {
         state.unreadCount = action.payload.unreadCount;
+      })
+      .addCase(acceptDirectChatRequest.fulfilled, (state, action) => {
+        state.items = state.items.filter((item) => item.referenceId !== action.payload?.id);
+        state.unreadCount = state.items.filter((item) => !item.isRead).length;
+      })
+      .addCase(rejectDirectChatRequest.fulfilled, (state, action) => {
+        state.items = state.items.filter((item) => item.referenceId !== action.payload?.id);
+        state.unreadCount = state.items.filter((item) => !item.isRead).length;
       });
   },
 });
