@@ -31,12 +31,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
 
-    if (mode === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(mode);
-    }
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const activeTheme = mode === 'system' ? systemTheme : mode;
+    root.classList.add(activeTheme);
 
     localStorage.setItem('meetify_theme_mode', mode);
   }, [mode]);
@@ -49,9 +46,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.style.setProperty('--slack-sidebar', theme.sidebar);
     root.style.setProperty('--slack-active', theme.active);
 
-    // In light mode, slack-bg is white, in dark mode it's handled by .dark class in CSS
-    // but we can also set it here for more control
-    if (mode === 'dark') {
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const activeTheme = mode === 'system' ? systemTheme : mode;
+
+    if (activeTheme === 'dark') {
       root.style.setProperty('--slack-bg', '#1A1D21');
       root.style.setProperty('--slack-text', '#D1D2D3');
       root.style.setProperty('--slack-border', '#35373B');

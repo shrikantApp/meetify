@@ -22,7 +22,8 @@ export function CreateChannelModal({ isOpen, onClose }: Props) {
   
   const searchResults = useAppSelector(state => state.chat.userSearchResults);
   const currentUser = useAppSelector(state => state.auth.userProfile);
-  const { activeWorkspaceId } = useAppSelector(state => state.workspace);
+  const { workspaces, activeWorkspaceId } = useAppSelector(state => state.workspace);
+  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,15 +81,22 @@ export function CreateChannelModal({ isOpen, onClose }: Props) {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)] bg-white/5">
-            <div>
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Create Channel</h2>
-              <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest mt-0.5">
-                Public or private space for your projects
-              </p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-[var(--text-primary)]">Create Channel</h2>
+                <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest mt-0.5">
+                  Public or private space for your projects
+                </p>
+              </div>
+            {activeWorkspace && (
+                <span className="px-2.5 py-1 bg-[var(--accent-primary)] text-white text-[10px] font-black uppercase tracking-wider rounded-md border border-[var(--accent-primary)]/20 shadow-sm whitespace-nowrap self-start mt-1 cursor-pointer hover:bg-[var(--accent-primary)]/30 transition-colors">
+                  {activeWorkspace.name}
+                </span>
+              )}
             </div>
             <button 
               onClick={onClose} 
-              className="p-2 text-[var(--text-muted)] hover:bg-white/10 rounded-xl transition-all hover:text-white"
+              className="p-2 text-[var(--text-muted)] hover:bg-[var(--accent-primary)]/10 rounded-xl transition-all hover:text-[var(--accent-primary)] dark:hover:text-[var(--accent-primary)]"
             >
               <X className="w-5 h-5" />
             </button>
@@ -99,13 +107,13 @@ export function CreateChannelModal({ isOpen, onClose }: Props) {
               <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest ml-1">Channel Name</label>
               <div className="relative group">
                  <Hash className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent-primary)] transition-colors" />
-                 <input
-                   type="text"
-                   value={groupName}
-                   onChange={e => setGroupName(e.target.value)}
-                   placeholder="e.g. project-apollo"
-                   className="w-full pl-11 pr-4 py-2.5 bg-white/5 border border-[var(--border-subtle)] rounded-xl focus:ring-4 focus:ring-[var(--accent-primary)]/10 focus:border-[var(--accent-primary)] outline-none transition-all font-semibold text-[13px] text-[var(--text-primary)] placeholder-[var(--text-muted)] shadow-inner"
-                 />
+                  <input
+                    type="text"
+                    value={groupName}
+                    onChange={e => setGroupName(e.target.value)}
+                    placeholder="e.g. project-apollo"
+                    className="w-full pl-11 pr-4 py-2.5 bg-black/5 dark:bg-white/5 border border-[var(--border-subtle)] rounded-xl focus:ring-4 focus:ring-[var(--accent-primary)]/10 focus:border-[var(--accent-primary)] outline-none transition-all font-semibold text-[13px] text-[var(--text-primary)] placeholder-[var(--text-muted)] shadow-inner"
+                  />
               </div>
             </div>
 
@@ -140,7 +148,7 @@ export function CreateChannelModal({ isOpen, onClose }: Props) {
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Search by name or email..."
-                  className="w-full pl-11 pr-4 py-2.5 bg-white/5 border border-[var(--border-subtle)] rounded-xl focus:ring-4 focus:ring-[var(--accent-primary)]/10 focus:border-[var(--accent-primary)] outline-none transition-all font-semibold text-[13px] text-[var(--text-primary)] placeholder-[var(--text-muted)] shadow-inner"
+                  className="w-full pl-11 pr-4 py-2.5 bg-black/5 dark:bg-white/5 border border-[var(--border-subtle)] rounded-xl focus:ring-4 focus:ring-[var(--accent-primary)]/10 focus:border-[var(--accent-primary)] outline-none transition-all font-semibold text-[13px] text-[var(--text-primary)] placeholder-[var(--text-muted)] shadow-inner"
                 />
                 {isSearching && (
                   <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -161,7 +169,7 @@ export function CreateChannelModal({ isOpen, onClose }: Props) {
                     className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${
                       selectedUsers.includes(user.id) 
                         ? 'bg-[var(--accent-primary)]/10 border-[var(--accent-primary)] shadow-md shadow-[var(--accent-primary)]/5' 
-                        : 'hover:bg-white/5 border-transparent'
+                        : 'hover:bg-black/5 dark:hover:bg-white/5 border-transparent'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -187,7 +195,7 @@ export function CreateChannelModal({ isOpen, onClose }: Props) {
           </div>
 
           <div className="px-6 py-4 border-t border-[var(--border-subtle)] bg-white/5 flex justify-end gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-[13px] font-bold hover:bg-white/10 rounded-xl transition-all text-[var(--text-secondary)]">
+            <button onClick={onClose} className="px-4 py-2 text-[13px] font-bold hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-all text-[var(--text-secondary)]">
               Cancel
             </button>
             <button 
@@ -196,7 +204,7 @@ export function CreateChannelModal({ isOpen, onClose }: Props) {
               className={`
                 px-5 py-2 text-[13px] font-bold rounded-xl transition-all shadow-xl flex items-center gap-2 min-w-[140px] justify-center
                 ${!groupName.trim() || selectedUsers.length === 0 || isSubmitting
-                  ? 'bg-white/5 text-[var(--text-muted)] cursor-not-allowed'
+                  ? 'bg-black/5 dark:bg-white/5 text-[var(--text-muted)] cursor-not-allowed'
                   : 'premium-gradient text-white hover:scale-105 active:scale-95'}
               `}
             >

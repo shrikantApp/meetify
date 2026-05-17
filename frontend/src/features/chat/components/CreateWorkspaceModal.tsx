@@ -41,7 +41,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md bg-[var(--bg-sidebar)] border border-[var(--border-medium)] rounded-2xl shadow-2xl overflow-hidden glass-morphism"
+            className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-2xl shadow-2xl overflow-hidden glass-morphism"
           >
             <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-white/5">
               <div className="flex items-center gap-2">
@@ -52,7 +52,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-white/10 rounded-xl transition-colors text-[var(--text-muted)] hover:text-white"
+                className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -69,7 +69,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Acme Corp, Engineering, Team Alpha"
-                  className="w-full bg-white/5 border border-[var(--border-subtle)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] transition-all placeholder:text-[var(--text-muted)]/50"
+                  className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border-subtle)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] transition-all placeholder:text-[var(--text-muted)]/50"
                 />
                 <p className="text-[10px] text-[var(--text-muted)] ml-1">
                   This will be the name of your new collaboration hub.
@@ -86,7 +86,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-4 py-3 rounded-xl font-bold text-[13px] text-[var(--text-primary)] hover:bg-white/5 transition-all"
+                  className="flex-1 px-4 py-3 rounded-xl font-bold text-[13px] text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5 transition-all"
                 >
                   Cancel
                 </button>
@@ -97,7 +97,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
                     flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-[13px] transition-all
                     ${name.trim() && !loading
                       ? 'premium-gradient text-white shadow-lg shadow-[var(--accent-primary)]/20 hover:scale-[1.02] active:scale-[0.98]'
-                      : 'bg-white/5 text-[var(--text-muted)] cursor-not-allowed'}
+                      : 'bg-black/5 dark:bg-white/5 text-[var(--text-muted)] cursor-not-allowed'}
                   `}
                 >
                   {loading ? (

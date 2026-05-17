@@ -73,8 +73,8 @@ export function ChatWindow({ conversationId, onOpenThread }: Props) {
 
   return (
     <div className="flex-1 relative flex flex-col min-h-0 bg-[var(--bg-base)] overflow-hidden">
-      <div 
-        className="flex-1 overflow-y-auto custom-scrollbar" 
+      <div
+        className="flex-1 overflow-y-auto custom-scrollbar"
         ref={scrollRef}
         onScroll={handleScroll}
       >
@@ -103,19 +103,19 @@ export function ChatWindow({ conversationId, onOpenThread }: Props) {
               return (
                 <div key={msg.id || msg.tempId}>
                   {showDateHeader && (
-                    <div className="sticky top-0 z-30 py-4 bg-[var(--bg-base)] relative">
+                    <div className="sticky top-0 z-1 py-4 bg-[var(--bg-base)] relative">
                       <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-px bg-[var(--border-subtle)]/50" />
                       <div className="relative flex justify-center">
-                        <DateDropdown 
-                          dateStr={dateStr} 
-                          onJumpToTop={jumpToTop} 
+                        <DateDropdown
+                          dateStr={dateStr}
+                          onJumpToTop={jumpToTop}
                           options={jumpOptions}
                         />
                       </div>
                     </div>
                   )}
-                  <MessageBubble 
-                    message={msg} 
+                  <MessageBubble
+                    message={msg}
                     isOwn={msg.senderId === me?.id}
                     showAvatar={showAvatar}
                     onReply={() => onOpenThread(msg.id)}
@@ -124,7 +124,7 @@ export function ChatWindow({ conversationId, onOpenThread }: Props) {
               );
             })}
           </AnimatePresence>
-          
+
           <div className="h-4 flex-shrink-0" />
         </div>
       </div>
@@ -175,7 +175,7 @@ function DateDropdown({ dateStr, onJumpToTop, options }: DateDropdownProps) {
 
   return (
     <div className="relative" ref={menuRef}>
-      <button 
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="px-4 py-1.5 bg-[var(--bg-base)]/90 border border-[var(--border-subtle)] rounded-full shadow-lg backdrop-blur-md mx-4 flex items-center gap-2 hover:border-[var(--border-medium)] transition-all group"
       >
@@ -184,44 +184,44 @@ function DateDropdown({ dateStr, onJumpToTop, options }: DateDropdownProps) {
         </span>
         <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      
+
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-52 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden z-[70] p-1.5"
           >
-             <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest border-b border-[var(--border-subtle)]/50 mb-1">Jump to...</div>
-             
-             {options.yesterday && (
-               <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors">Yesterday</button>
-             )}
-             {options.lastWeek && (
-               <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors">Last week</button>
-             )}
-             {options.lastMonth && (
-               <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors">Last month</button>
-             )}
-             
-             {options.beginning && (
-               <button 
-                 onClick={() => { onJumpToTop(); setIsOpen(false); }}
-                 className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors"
-               >
-                 The very beginning
-               </button>
-             )}
+            <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest border-b border-[var(--border-subtle)]/50 mb-1">Jump to...</div>
 
-             {!options.yesterday && !options.lastWeek && !options.lastMonth && !options.beginning && (
-               <div className="px-3 py-4 text-center">
-                 <span className="text-[11px] text-[var(--text-muted)] italic">No older history available</span>
-               </div>
-             )}
+            {options.yesterday && (
+              <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors">Yesterday</button>
+            )}
+            {options.lastWeek && (
+              <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors">Last week</button>
+            )}
+            {options.lastMonth && (
+              <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors">Last month</button>
+            )}
 
-             <div className="h-px bg-[var(--border-subtle)]/50 my-1.5" />
-             <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-sky-400 font-medium transition-colors">Jump to a specific date</button>
+            {options.beginning && (
+              <button
+                onClick={() => { onJumpToTop(); setIsOpen(false); }}
+                className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-[var(--text-primary)] transition-colors"
+              >
+                The very beginning
+              </button>
+            )}
+
+            {!options.yesterday && !options.lastWeek && !options.lastMonth && !options.beginning && (
+              <div className="px-3 py-4 text-center">
+                <span className="text-[11px] text-[var(--text-muted)] italic">No older history available</span>
+              </div>
+            )}
+
+            <div className="h-px bg-[var(--border-subtle)]/50 my-1.5" />
+            <button className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg text-[12px] text-sky-400 font-medium transition-colors">Jump to a specific date</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -231,13 +231,13 @@ function DateDropdown({ dateStr, onJumpToTop, options }: DateDropdownProps) {
 
 function Hash({ className }: { className?: string }) {
   return (
-    <svg 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2.5" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       className={className}
     >
       <line x1="4" y1="9" x2="20" y2="9"></line>

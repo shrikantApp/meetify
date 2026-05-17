@@ -24,12 +24,12 @@ export default function ParticipantControlModal({
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div 
-                className="w-full max-w-sm bg-bg-card border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+                className="w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between p-6 border-b border-white/5">
-                    <h3 className="text-lg font-bold text-white">Participant Actions</h3>
-                    <button onClick={onClose} className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)]">
+                    <h3 className="text-lg font-bold text-[var(--text-primary)]">Participant Actions</h3>
+                    <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-all">
                         <X size={20} />
                     </button>
                 </div>
@@ -38,32 +38,32 @@ export default function ParticipantControlModal({
                     <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center text-accent text-3xl font-bold mb-4 shadow-lg shadow-accent/10">
                         {participant.userName[0].toUpperCase()}
                     </div>
-                    <h4 className="text-xl font-bold text-white mb-1">{participant.userName}</h4>
-                    <p className="text-xs text-white/30 mb-6 tracking-wider uppercase font-bold">Online Participant</p>
+                    <h4 className="text-xl font-bold text-[var(--text-primary)] mb-1">{participant.userName}</h4>
+                    <p className="text-xs text-[var(--text-muted)] mb-6 tracking-wider uppercase font-bold">Online Participant</p>
 
                     <div className="w-full grid grid-cols-2 gap-3">
                         <button
                             onClick={() => onAction(participant.isPinned ? 'unpin' : 'pin', participant.socketId)}
-                            className="flex flex-col items-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all group"
+                            className="flex flex-col items-center gap-2 p-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-subtle)] rounded-2xl transition-all group"
                         >
-                            {participant.isPinned ? <PinOff size={20} className="text-accent" /> : <Pin size={20} className="text-white/60 group-hover:text-white" />}
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">{participant.isPinned ? 'Unpin' : 'Pin'}</span>
+                            {participant.isPinned ? <PinOff size={20} className="text-accent" /> : <Pin size={20} className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />}
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-primary)]/80">{participant.isPinned ? 'Unpin' : 'Pin'}</span>
                         </button>
 
                         <button
                             onClick={() => onAction('mute', participant.socketId)}
-                            className="flex flex-col items-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all group"
+                            className="flex flex-col items-center gap-2 p-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-subtle)] rounded-2xl transition-all group"
                         >
-                            {participant.isMicOn ? <Mic size={20} className="text-white/60 group-hover:text-white" /> : <MicOff size={20} className="text-accent-danger" />}
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">{participant.isMicOn ? 'Mute' : 'Muted'}</span>
+                            {participant.isMicOn ? <Mic size={20} className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" /> : <MicOff size={20} className="text-accent-danger" />}
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-primary)]/80">{participant.isMicOn ? 'Mute' : 'Muted'}</span>
                         </button>
 
                         <button
                             onClick={() => onAction('disable-camera', participant.socketId)}
-                            className="flex flex-col items-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all group"
+                            className="flex flex-col items-center gap-2 p-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-subtle)] rounded-2xl transition-all group"
                         >
-                            {participant.isCamOn ? <Video size={20} className="text-white/60 group-hover:text-white" /> : <VideoOff size={20} className="text-accent-danger" />}
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">{participant.isCamOn ? 'Stop Video' : 'Video Off'}</span>
+                            {participant.isCamOn ? <Video size={20} className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" /> : <VideoOff size={20} className="text-accent-danger" />}
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-primary)]/80">{participant.isCamOn ? 'Stop Video' : 'Video Off'}</span>
                         </button>
 
                         <button
@@ -76,10 +76,10 @@ export default function ParticipantControlModal({
                     </div>
                 </div>
 
-                <div className="p-4 bg-white/5 border-t border-white/5 flex justify-center">
+                <div className="p-4 bg-black/[0.02] dark:bg-white/5 border-t border-[var(--border-subtle)] flex justify-center">
                     <button 
                         onClick={onClose}
-                        className="text-xs font-bold text-white/40 hover:text-white transition-all uppercase tracking-[0.2em]"
+                        className="text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all uppercase tracking-[0.2em]"
                     >
                         Close Menu
                     </button>

@@ -119,35 +119,35 @@ export default function DeviceSettingsModal({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-bg-card border border-white/10 w-full max-w-2xl rounded-[2rem] overflow-hidden shadow-2xl flex flex-col md:flex-row h-[500px]">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-medium)] w-full max-w-2xl rounded-[2rem] overflow-hidden shadow-2xl flex flex-col md:flex-row h-[500px]">
                 {/* Sidebar */}
-                <div className="w-full md:w-64 bg-white/5 p-6 flex flex-col gap-2 border-r border-white/5">
-                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <div className="w-full md:w-64 bg-black/[0.02] dark:bg-white/5 p-6 flex flex-col gap-2 border-r border-[var(--border-subtle)]">
+                    <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
                         <Settings size={20} className="text-accent" />
                         Settings
                     </h2>
 
                     <button
                         onClick={() => setActiveTab('audio')}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'audio' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'audio' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--text-primary)] dark:hover:text-white'}`}
                     >
                         <Mic size={18} /> Audio
                     </button>
                     <button
                         onClick={() => setActiveTab('video')}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'video' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'video' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--text-primary)] dark:hover:text-white'}`}
                     >
                         <Video size={18} /> Video
                     </button>
                     <button
                         onClick={() => setActiveTab('appearance')}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'appearance' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'appearance' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--text-primary)] dark:hover:text-white'}`}
                     >
                         <Type size={18} /> Appearance
                     </button>
                     <button
                         onClick={() => setActiveTab('general')}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'general' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${activeTab === 'general' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--text-primary)] dark:hover:text-white'}`}
                     >
                         <Speaker size={18} /> General
                     </button>
@@ -155,7 +155,7 @@ export default function DeviceSettingsModal({
                     <div className="mt-auto">
                         <button
                             onClick={onClose}
-                            className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all"
+                            className="w-full py-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-primary)] dark:text-white rounded-xl font-bold transition-all border border-[var(--border-subtle)]"
                         >
                             Done
                         </button>
@@ -167,24 +167,24 @@ export default function DeviceSettingsModal({
                     {activeTab === 'audio' && (
                         <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                             <div>
-                                <label className="block text-sm font-bold text-text-secondary mb-3 uppercase tracking-wider">Microphone</label>
+                                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider">Microphone</label>
                                 <select
                                     value={selectedAudioId}
                                     onChange={(e) => onAudioDeviceChange(e.target.value)}
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                                    className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border-medium)] rounded-xl px-4 py-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-accent transition-all"
                                 >
                                     {audioDevices.map(d => (
-                                        <option key={d.deviceId} value={d.deviceId} className="bg-bg-card">{d.label || `Microphone ${d.deviceId.slice(0, 5)}`}</option>
+                                        <option key={d.deviceId} value={d.deviceId} className="bg-[var(--bg-card)] text-[var(--text-primary)]">{d.label || `Microphone ${d.deviceId.slice(0, 5)}`}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
-                                <div className={`p-3 rounded-xl ${volume > 10 ? 'bg-accent/20 text-accent animate-pulse' : 'bg-white/5 text-text-secondary'}`}>
+                            <div className="flex items-center gap-4 p-4 bg-black/[0.02] dark:bg-white/5 rounded-2xl border border-[var(--border-subtle)]">
+                                <div className={`p-3 rounded-xl ${volume > 10 ? 'bg-accent/20 text-accent animate-pulse' : 'bg-black/5 dark:bg-white/5 text-[var(--text-secondary)]'}`}>
                                     <Mic size={20} />
                                 </div>
                                 <div className="flex-1">
-                                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                    <div className="h-1.5 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-accent transition-all duration-75"
                                             style={{ width: `${Math.min(100, volume * 3)}%` }}
@@ -198,14 +198,14 @@ export default function DeviceSettingsModal({
                     {activeTab === 'video' && (
                         <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                             <div>
-                                <label className="block text-sm font-bold text-text-secondary mb-3 uppercase tracking-wider">Camera</label>
+                                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider">Camera</label>
                                 <select
                                     value={selectedVideoId}
                                     onChange={(e) => onVideoDeviceChange(e.target.value)}
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                                    className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border-medium)] rounded-xl px-4 py-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-accent transition-all"
                                 >
                                     {videoDevices.map(d => (
-                                        <option key={d.deviceId} value={d.deviceId} className="bg-bg-card">{d.label || `Camera ${d.deviceId.slice(0, 5)}`}</option>
+                                        <option key={d.deviceId} value={d.deviceId} className="bg-[var(--bg-card)] text-[var(--text-primary)]">{d.label || `Camera ${d.deviceId.slice(0, 5)}`}</option>
                                     ))}
                                 </select>
                             </div>
@@ -223,14 +223,14 @@ export default function DeviceSettingsModal({
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 cursor-pointer hover:bg-white/10 transition-all" onClick={() => onMirrorToggle(!isMirrored)}>
+                            <div className="flex items-center justify-between p-4 bg-black/[0.02] dark:bg-white/5 rounded-2xl border border-[var(--border-subtle)] cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-all" onClick={() => onMirrorToggle(!isMirrored)}>
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${isMirrored ? 'bg-accent/20 text-accent' : 'bg-white/5 text-text-secondary'}`}>
+                                    <div className={`p-2 rounded-lg ${isMirrored ? 'bg-accent/20 text-accent' : 'bg-black/5 dark:bg-white/5 text-[var(--text-secondary)]'}`}>
                                         <FlipHorizontal size={18} />
                                     </div>
-                                    <span className="text-sm font-semibold">Mirror my video</span>
+                                    <span className="text-sm font-semibold text-[var(--text-primary)]">Mirror my video</span>
                                 </div>
-                                <div className={`w-10 h-5 rounded-full transition-all relative ${isMirrored ? 'bg-accent' : 'bg-white/10'}`}>
+                                <div className={`w-10 h-5 rounded-full transition-all relative ${isMirrored ? 'bg-accent' : 'bg-black/10 dark:bg-white/10'}`}>
                                     <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isMirrored ? 'right-1' : 'left-1'}`} />
                                 </div>
                             </div>
@@ -240,10 +240,10 @@ export default function DeviceSettingsModal({
                     {activeTab === 'appearance' && (
                         <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                             {/* Theme Toggle */}
-                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <div className="flex items-center justify-between p-4 bg-black/[0.02] dark:bg-white/5 rounded-2xl border border-[var(--border-subtle)]">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-semibold text-white">Theme</p>
-                                    <p className="text-xs text-text-secondary">Switch between light and dark mode</p>
+                                    <p className="text-sm font-semibold text-[var(--text-primary)]">Theme</p>
+                                    <p className="text-xs text-[var(--text-secondary)]">Switch between light and dark mode</p>
                                 </div>
                                 <button
                                     onClick={() => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
@@ -254,9 +254,9 @@ export default function DeviceSettingsModal({
                             </div>
 
                             {/* Font Size Slider */}
-                            <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <div className="space-y-4 p-4 bg-black/[0.02] dark:bg-white/5 rounded-2xl border border-[var(--border-subtle)]">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
                                         <Type size={16} className="text-accent" />
                                         Font Size
                                     </div>
@@ -269,14 +269,14 @@ export default function DeviceSettingsModal({
                                     step="1"
                                     value={settings.fontSize}
                                     onChange={(e) => updateSettings({ fontSize: parseInt(e.target.value) })}
-                                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
+                                    className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
                                 />
                             </div>
 
                             {/* Icon Size Slider */}
-                            <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <div className="space-y-4 p-4 bg-black/[0.02] dark:bg-white/5 rounded-2xl border border-[var(--border-subtle)]">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
                                         <Maximize2 size={16} className="text-accent" />
                                         Icon Size
                                     </div>
@@ -289,14 +289,14 @@ export default function DeviceSettingsModal({
                                     step="1"
                                     value={settings.iconSize}
                                     onChange={(e) => updateSettings({ iconSize: parseInt(e.target.value) })}
-                                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
+                                    className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
                                 />
                             </div>
 
                             {/* Button Size Slider */}
-                            <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <div className="space-y-4 p-4 bg-black/[0.02] dark:bg-white/5 rounded-2xl border border-[var(--border-subtle)]">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
                                         <MousePointer2 size={16} className="text-accent" />
                                         Button Size
                                     </div>
@@ -309,7 +309,7 @@ export default function DeviceSettingsModal({
                                     step="2"
                                     value={settings.buttonSize}
                                     onChange={(e) => updateSettings({ buttonSize: parseInt(e.target.value) })}
-                                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
+                                    className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-accent"
                                 />
                             </div>
                         </div>
@@ -317,8 +317,8 @@ export default function DeviceSettingsModal({
 
                     {activeTab === 'general' && (
                         <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                            <div className="p-8 flex flex-col items-center justify-center text-center gap-4 opacity-40">
-                                <Volume2 size={48} className="text-text-secondary" />
+                            <div className="p-8 flex flex-col items-center justify-center text-center gap-4 opacity-40 text-[var(--text-primary)]">
+                                <Volume2 size={48} className="text-[var(--text-secondary)]" />
                                 <p className="text-sm font-medium">Speaker selection is currently managed by your system's default output.</p>
                             </div>
                         </div>

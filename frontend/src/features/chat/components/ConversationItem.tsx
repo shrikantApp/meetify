@@ -48,8 +48,8 @@ export function ConversationItem({ conversation, active, onClick }: Props) {
       className={`
         flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all duration-200 group
         ${active 
-          ? 'bg-white/10 text-[var(--text-primary)] shadow-sm' 
-          : 'hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}
+          ? 'bg-white/10 text-white shadow-sm' 
+          : 'hover:bg-white/5 text-white/70 hover:text-white'}
         ${hasUnread && !active ? 'font-bold' : ''}
       `}
     >
@@ -57,7 +57,7 @@ export function ConversationItem({ conversation, active, onClick }: Props) {
         {conversation.type === 'group' ? (
           <div className={`
             w-7 h-7 rounded-lg flex items-center justify-center transition-colors
-            ${active ? 'bg-[var(--accent-primary)] text-white' : 'bg-white/5 text-[var(--text-muted)] group-hover:bg-white/10'}
+            ${active ? 'bg-[var(--accent-primary)] text-white' : 'bg-white/5 text-white/40 group-hover:bg-white/10'}
           `}>
             <Hash className="w-3.5 h-3.5" />
           </div>

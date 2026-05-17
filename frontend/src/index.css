@@ -69,6 +69,34 @@
   --slack-active: #6366f1;
 }
 
+.light,
+.light-theme,
+[data-theme='light'] {
+  --bg-base: var(--slack-bg, #ffffff);
+  --bg-sidebar: var(--slack-sidebar, #f8f9fa);
+  --bg-workspace: var(--slack-sidebar, #f8f9fa);
+  --bg-card: var(--slack-bg, #ffffff);
+  --bg-card-hover: var(--slack-hover, #f1f3f5);
+  
+  --accent-primary: var(--slack-active, #1164A3);
+  --accent-secondary: var(--slack-accent, #007a5a);
+  --accent-gradient: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  
+  --text-primary: var(--slack-text, #1d1c1d);
+  --text-secondary: var(--slack-text-muted, #616061);
+  --text-muted: #868686;
+  
+  --border-subtle: var(--slack-border, #e2e2e2);
+  --border-medium: var(--slack-border, #d1d1d1);
+
+  --slack-bg: #ffffff;
+  --slack-sidebar: #3f0e40;
+  --slack-text: #1d1c1d;
+  --slack-text-muted: #616061;
+  --slack-border: #e2e2e2;
+  --slack-active: #1164a3;
+}
+
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-base);

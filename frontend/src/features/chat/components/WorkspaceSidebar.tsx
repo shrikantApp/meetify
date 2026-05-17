@@ -18,7 +18,7 @@ export const WorkspaceSidebar = () => {
   }, [dispatch]);
 
   return (
-    <div className="w-[70px] flex-shrink-0 h-full bg-[var(--bg-workspace)] border-r border-[var(--border-subtle)] flex flex-col items-center py-4 z-50 shadow-2xl">
+    <div className="w-[70px] flex-shrink-0 h-full bg-[var(--bg-workspace)] border-r border-white/10 flex flex-col items-center py-4 z-50 shadow-2xl relative">
       <div className="flex-1 flex flex-col items-center gap-4 overflow-y-auto custom-scrollbar w-full">
         {/* All Workspaces */}
         {workspaces.map((workspace) => (
@@ -32,11 +32,11 @@ export const WorkspaceSidebar = () => {
         ))}
 
         {workspaces.length > 0 && (
-          <div className="w-8 h-[2px] bg-[var(--border-subtle)] rounded-full flex-shrink-0" />
+          <div className="w-8 h-[2px] bg-white/10 rounded-full flex-shrink-0" />
         )}
       </div>
 
-      <div className="mt-auto flex flex-col items-center gap-4 pt-4 border-t border-[var(--border-subtle)] w-full">
+      <div className="mt-auto flex flex-col items-center gap-4 pt-4 border-t border-white/10 w-full">
         <WorkspaceIcon
           icon={<Plus className="w-6 h-6" />}
           label="Add Workspace"
