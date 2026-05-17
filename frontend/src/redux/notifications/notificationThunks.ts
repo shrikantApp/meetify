@@ -3,7 +3,9 @@ import { notificationApi } from '../../services/notificationApi';
 import { chatApi } from '../../services/chatApi';
 
 export const fetchNotifications = createAsyncThunk('notifications/fetch', async () => {
-  return notificationApi.list('all');
+  // We only show actionable/unread items in the bell by default.
+  // Read items are still available via API if we add a "view all" later.
+  return notificationApi.list('unread');
 });
 
 export const fetchUnreadCount = createAsyncThunk('notifications/unreadCount', async () => {

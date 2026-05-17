@@ -22,6 +22,7 @@ import { WorkspaceSidebar } from './components/WorkspaceSidebar';
 import { TopNav } from './components/TopNav';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../../styles/chat-overrides.css';
+import { Tooltip } from '../../components/ui';
 
 
 export default function ChatPage() {
@@ -151,6 +152,12 @@ export default function ChatPage() {
     emit(isTyping ? 'typing_start' : 'typing_stop', { conversationId: activeConv.id });
   };
 
+  const directOtherMember = activeConv?.type === 'direct'
+    ? activeConv.members?.find((m) => m.userId !== currentUser?.id)
+    : null;
+  const directOtherAvatarUrl =
+    directOtherMember ? ((directOtherMember.user as any)?.avatarUrl || (directOtherMember.user as any)?.avatar || null) : null;
+
   return (
     <div className="chat-theme-root flex h-screen bg-[var(--bg-base)] overflow-hidden text-[var(--text-primary)] font-sans selection:bg-[var(--accent-primary)]/30">
       <WorkspaceSidebar />
@@ -167,19 +174,27 @@ export default function ChatPage() {
                 <>
                   {/* Chat Header (Sticky) */}
                   <header className="h-[52px] flex-shrink-0 border-b border-[var(--border-subtle)] flex items-center justify-between px-4 bg-[var(--bg-base)]/80 backdrop-blur-md z-20">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <div className="flex items-center gap-1.5 group cursor-pointer">
-                        {activeConv.type === 'group' ? (
-                          <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-[var(--text-secondary)]">
-                            <Hash className="w-3.5 h-3.5" />
-                          </div>
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex items-center gap-1.5 group cursor-pointer">
+            {activeConv.type === 'group' ? (
+              <div className="w-7 h-7 rounded-lg bg-[var(--surface-soft)] flex items-center justify-center text-[var(--text-secondary)]">
+                <Hash className="w-3.5 h-3.5" />
+              </div>
                         ) : (
-                          <div className="w-7 h-7 rounded-lg premium-gradient flex items-center justify-center text-white font-bold text-[10px]">
-                            {(() => {
-                              const otherMember = activeConv.members?.find(m => m.userId !== currentUser?.id);
-                              return (otherMember?.user?.name || activeConv.name || 'C').charAt(0).toUpperCase();
-                            })()}
-                          </div>
+                          directOtherAvatarUrl ? (
+                            <img
+                              src={directOtherAvatarUrl}
+                              alt={directOtherMember?.user?.name || activeConv.name || 'Chat'}
+                              className="w-7 h-7 rounded-lg object-cover border border-white/10"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 rounded-lg premium-gradient flex items-center justify-center text-white font-bold text-[10px]">
+                              {(() => {
+                                const otherMember = activeConv.members?.find(m => m.userId !== currentUser?.id);
+                                return (otherMember?.user?.name || activeConv.name || 'C').charAt(0).toUpperCase();
+                              })()}
+                            </div>
+                          )
                         )}
                         <div className="flex flex-col">
                           <h2 className="text-[13px] font-bold truncate">
@@ -267,13 +282,21 @@ export default function ChatPage() {
                         >
                           <div className="p-3 flex items-center justify-between border-b border-[var(--border-subtle)]">
                             <h3 className="font-bold text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Details</h3>
-                            <button onClick={() => setShowDetails(false)} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-muted)] transition-colors text-lg">&times;</button>
+                            <button onClick={() => setShowDetails(false)} className="chat-icon-button chat-icon-button-muted p-1 rounded-lg text-lg">&times;</button>
                           </div>
 
                           <div className="p-6 flex flex-col items-center text-center border-b border-[var(--border-subtle)]">
-                            <div className="w-20 h-20 rounded-2xl premium-gradient flex items-center justify-center text-white text-2xl font-bold mb-3 shadow-xl premium-shadow">
-                              {(activeConv.type === 'direct' ? (activeConv.members?.find(m => m.userId !== currentUser?.id)?.user?.name?.charAt(0)) : activeConv.name?.charAt(0))?.toUpperCase() || 'C'}
-                            </div>
+                            {activeConv.type === 'direct' && directOtherAvatarUrl ? (
+                              <img
+                                src={directOtherAvatarUrl}
+                                alt={directOtherMember?.user?.name || activeConv.name || 'Chat'}
+                                className="w-20 h-20 rounded-2xl object-cover border border-[var(--border-subtle)] mb-3 shadow-xl premium-shadow"
+                              />
+                            ) : (
+                              <div className="w-20 h-20 rounded-2xl premium-gradient flex items-center justify-center text-white text-2xl font-bold mb-3 shadow-xl premium-shadow">
+                                {(activeConv.type === 'direct' ? (activeConv.members?.find(m => m.userId !== currentUser?.id)?.user?.name?.charAt(0)) : activeConv.name?.charAt(0))?.toUpperCase() || 'C'}
+                              </div>
+                            )}
                             <h3 className="text-lg font-bold mb-0.5">
                               {activeConv.type === 'direct' ? (activeConv.members?.find(m => m.userId !== currentUser?.id)?.user?.name || activeConv.name || 'Chat') : activeConv.name}
                             </h3>
@@ -288,7 +311,7 @@ export default function ChatPage() {
                               >
                                 Call
                               </button>
-                              <button className="flex-1 py-2 bg-white/5 border border-[var(--border-subtle)] hover:bg-white/10 rounded-xl text-[11px] font-bold transition-all">Mute</button>
+                              <button className="flex-1 py-2 bg-[var(--surface-soft)] border border-[var(--border-subtle)] hover:bg-[var(--surface-soft-hover)] rounded-xl text-[11px] font-bold transition-all">Mute</button>
                             </div>
                           </div>
 
@@ -313,16 +336,24 @@ export default function ChatPage() {
                                   onClick={() => setIsAddMemberModalOpen(true)}
                                   className="w-full flex items-center gap-2.5 p-2 hover:bg-white/5 rounded-xl transition-colors text-left group"
                                 >
-                                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[var(--accent-primary)] group-hover:bg-[var(--accent-primary)] group-hover:text-white transition-all">
+                                  <div className="w-8 h-8 rounded-lg bg-[var(--surface-soft)] flex items-center justify-center text-[var(--accent-primary)] group-hover:bg-[var(--accent-primary)] group-hover:text-white transition-all">
                                     <UserPlus className="w-3.5 h-3.5" />
                                   </div>
                                   <span className="text-[13px] font-semibold text-[var(--accent-primary)] group-hover:underline">Add People</span>
                                 </button>
                                 {activeConv.members?.slice(0, 5).map(m => (
                                   <div key={m.id} className="flex items-center gap-2.5 p-2 hover:bg-white/5 rounded-xl transition-colors cursor-pointer group">
-                                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-bold text-[var(--text-secondary)]">
-                                      {m.user?.name?.charAt(0).toUpperCase() || '?'}
-                                    </div>
+                                    {((m.user as any)?.avatarUrl || (m.user as any)?.avatar) ? (
+                                      <img
+                                        src={((m.user as any)?.avatarUrl || (m.user as any)?.avatar) as string}
+                                        alt={m.user?.name || 'User'}
+                                        className="w-8 h-8 rounded-lg object-cover border border-[var(--border-subtle)]"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-lg bg-[var(--surface-soft)] border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-bold text-[var(--text-secondary)]">
+                                        {m.user?.name?.charAt(0).toUpperCase() || '?'}
+                                      </div>
+                                    )}
                                     <div className="flex-1 min-w-0">
                                       <p className="text-[13px] font-semibold truncate text-[var(--text-primary)]">{m.user?.name}{m.userId === currentUser?.id && ' (You)'}</p>
                                       <p className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-widest leading-none">{m.role}</p>
@@ -376,15 +407,16 @@ export default function ChatPage() {
 
 function ActionButton({ icon, onClick, tooltip, active = false }: { icon: any, onClick?: () => void, tooltip: string, active?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      title={tooltip}
-      className={`p-2 rounded-xl transition-all duration-200 ${active
-          ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20'
-          : 'hover:bg-white/10 text-[var(--text-secondary)] hover:text-white'
+    <Tooltip content={tooltip}>
+      <button
+        onClick={onClick}
+        className={`p-2 rounded-xl transition-all duration-200 ${active
+            ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20'
+            : 'chat-icon-button'
         }`}
-    >
+      >
       {icon}
-    </button>
+      </button>
+    </Tooltip>
   );
 }

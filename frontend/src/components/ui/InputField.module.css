@@ -113,3 +113,7 @@
   border-color: rgba(225, 29, 72, 0.45);
   box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.12);
 }
+
+.customControl {
+  width: 100%;
+}

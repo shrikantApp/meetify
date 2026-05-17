@@ -40,6 +40,8 @@
   --bg-workspace: var(--slack-sidebar, #08090d);
   --bg-card: rgba(23, 27, 41, 0.4);
   --bg-card-hover: rgba(31, 37, 64, 0.6);
+  --surface-soft: rgba(255, 255, 255, 0.05);
+  --surface-soft-hover: rgba(255, 255, 255, 0.1);
   
   --accent-primary: var(--slack-active, #6366f1);
   --accent-secondary: var(--slack-primary, #a855f7);
@@ -48,6 +50,7 @@
   --text-primary: var(--slack-text, #f1f5f9);
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
+  --icon-hover-text: var(--text-primary);
   
   --border-subtle: var(--slack-border, rgba(255, 255, 255, 0.05));
   --border-medium: var(--slack-border, rgba(255, 255, 255, 0.1));
@@ -77,6 +80,8 @@
   --bg-workspace: var(--slack-sidebar, #f8f9fa);
   --bg-card: var(--slack-bg, #ffffff);
   --bg-card-hover: var(--slack-hover, #f1f3f5);
+  --surface-soft: rgba(29, 28, 29, 0.04);
+  --surface-soft-hover: rgba(29, 28, 29, 0.08);
   
   --accent-primary: var(--slack-active, #1164A3);
   --accent-secondary: var(--slack-accent, #007a5a);
@@ -85,6 +90,7 @@
   --text-primary: var(--slack-text, #1d1c1d);
   --text-secondary: var(--slack-text-muted, #616061);
   --text-muted: #868686;
+  --icon-hover-text: var(--text-primary);
   
   --border-subtle: var(--slack-border, #e2e2e2);
   --border-medium: var(--slack-border, #d1d1d1);
@@ -342,6 +348,119 @@ body {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-medium);
+}
+
+.chat-icon-button {
+  color: var(--text-secondary);
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.chat-icon-button:hover {
+  background: var(--surface-soft-hover);
+  color: var(--icon-hover-text);
+}
+
+.chat-icon-button-muted {
+  color: var(--text-muted);
+}
+
+.chat-icon-button-accent:hover {
+  color: var(--accent-primary);
+}
+
+/* Profile Modal: react-datepicker + react-select */
+.meetify-datepicker {
+  width: 100%;
+  border: 1px solid var(--border-subtle, var(--slack-border));
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary, var(--slack-text));
+  border-radius: 0.85rem;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.92rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.meetify-datepicker:focus {
+  border-color: var(--accent-primary, var(--slack-active));
+  box-shadow: 0 0 0 4px rgba(17, 100, 163, 0.14);
+}
+.react-datepicker__year-select:hover, .react-datepicker__month-select:hover{
+  box-shadow: none!important;
+}
+.react-datepicker__year-select, .react-datepicker__month-select{
+  box-shadow: none!important;
+  outline: none!important;
+  background-color: var(--bg-base) !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+.meetify-datepicker-error {
+  border-color: rgba(225, 29, 72, 0.45);
+  box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.12);
+}
+
+.react-datepicker {
+  background-color: var(--bg-base) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-premium);
+}
+
+.react-datepicker__header {
+  background-color: var(--bg-base) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker-time__header,
+.react-datepicker-year-header {
+  color: var(--text-primary) !important;
+}
+
+.react-datepicker__day-name,
+.react-datepicker__day,
+.react-datepicker__time-name {
+  color: var(--text-primary) !important;
+}
+
+.react-datepicker__month-container {
+  background-color: var(--bg-base) !important;
+}
+
+.react-datepicker__day--outside-month {
+  color: color-mix(in srgb, var(--text-primary) 45%, transparent) !important;
+}
+
+.react-datepicker__day:hover:not(.react-datepicker__day--keyboard-selected) {
+  background: var(--surface-soft-hover);
+  color: var(--text-secondary)!important;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.react-datepicker-popper {
+  z-index: 400 !important;
+}
+
+.react-datepicker__triangle {
+  display: none;
+}
+
+.react-datepicker,
+.react-datepicker__month-container {
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+/* Make DatePicker input fit like InputField */
+.react-datepicker-wrapper,
+.react-datepicker__input-container {
+  width: 100%;
 }
 
 .premium-gradient {

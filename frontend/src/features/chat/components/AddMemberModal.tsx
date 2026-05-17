@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../../redux/store';
 import { searchUsers, addMemberToGroup } from '../../../redux/chat/chatThunks';
 import { setUserSearchResults } from '../../../redux/chat/chatSlice';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ModalPortal } from '../../../components/ui';
 
 interface Props {
   isOpen: boolean;
@@ -66,8 +67,9 @@ export function AddMemberModal({ isOpen, onClose, conversationId, existingMember
   );
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+    <ModalPortal>
+      <AnimatePresence>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -201,7 +203,8 @@ export function AddMemberModal({ isOpen, onClose, conversationId, existingMember
             </button>
           </div>
         </motion.div>
-      </div>
-    </AnimatePresence>
+        </div>
+      </AnimatePresence>
+    </ModalPortal>
   );
 }

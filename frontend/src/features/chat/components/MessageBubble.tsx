@@ -9,6 +9,7 @@ import { toggleReaction, editMessage, deleteMessage } from '../../../redux/chat/
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { meetingApi } from '../../../services/meetingApi';
+import { Tooltip } from '../../../components/ui';
 
 interface Props {
   message: Message;
@@ -76,13 +77,21 @@ export function MessageBubble({ message, isOwn, showAvatar = true, onReply }: Pr
       {/* Avatar / Icon / Time Column */}
       <div className="w-9 flex-shrink-0 flex flex-col items-center">
         {isMeeting ? (
-          <div className="w-8 h-8 rounded-lg bg-white/5 border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-[var(--surface-soft)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shadow-sm">
             <Headphones className="w-4 h-4" />
           </div>
         ) : showAvatar ? (
-          <div className="w-8 h-8 rounded-lg bg-white/5 border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-bold text-[var(--text-primary)] shadow-sm">
-            {message.sender?.name?.charAt(0).toUpperCase() || '?'}
-          </div>
+          ((message.sender as any)?.avatarUrl || (message.sender as any)?.avatar) ? (
+            <img
+              src={((message.sender as any)?.avatarUrl || (message.sender as any)?.avatar) as string}
+              alt={message.sender?.name || 'User'}
+              className="w-8 h-8 rounded-lg object-cover border border-[var(--border-subtle)] shadow-sm"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-white/5 border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-bold text-[var(--text-primary)] shadow-sm">
+              {message.sender?.name?.charAt(0).toUpperCase() || '?'}
+            </div>
+          )
         ) : (
           <div className="text-[9px] text-[var(--text-muted)] font-bold opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
              {format(new Date(message.createdAt), 'HH:mm')}
@@ -236,7 +245,7 @@ function MessageContent({ content }: { content: string }) {
           <button 
             onClick={() => !isEnded && window.open(fullUrl, '_blank')}
             disabled={isEnded}
-            className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all border ${
+                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all border ${
               isEnded 
               ? 'bg-white/5 text-[var(--text-muted)] cursor-not-allowed border-[var(--border-subtle)]' 
               : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white border-emerald-500/20'
@@ -267,13 +276,14 @@ function MessageContent({ content }: { content: string }) {
 
 function ActionButton({ icon, onClick, tooltip }: { icon: any, onClick?: () => void, tooltip: string }) {
   return (
-    <button 
-      onClick={onClick}
-      title={tooltip}
-      className="p-1.5 hover:bg-white/10 rounded-lg transition-all duration-200 text-[var(--text-secondary)] hover:text-white"
-    >
-      {icon}
-    </button>
+    <Tooltip content={tooltip}>
+      <button 
+        onClick={onClick}
+        className="chat-icon-button p-1.5 rounded-lg"
+      >
+        {icon}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -290,15 +300,15 @@ function AttachmentPreview({ attachment }: { attachment: Attachment }) {
   }
 
   return (
-    <div className="flex items-center gap-3 p-4 bg-white/5 border border-[var(--border-subtle)] rounded-2xl max-w-sm group/att cursor-pointer hover:bg-white/10 transition-all glass-morphism">
-      <div className="w-10 h-10 rounded-xl bg-white/5 border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] group-hover/att:text-[var(--accent-primary)] transition-colors">
+    <div className="flex items-center gap-3 p-4 bg-[var(--surface-soft)] border border-[var(--border-subtle)] rounded-2xl max-w-sm group/att cursor-pointer hover:bg-[var(--surface-soft-hover)] transition-all glass-morphism">
+      <div className="w-10 h-10 rounded-xl bg-[var(--surface-soft)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] group-hover/att:text-[var(--accent-primary)] transition-colors">
         <FileText className="w-6 h-6" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-[var(--text-primary)] truncate">{attachment.originalName}</p>
         <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">{(attachment.sizeBytes / 1024).toFixed(1)} KB</p>
       </div>
-      <a href={attachment.url} download={attachment.originalName} className="p-2 hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover/att:opacity-100 text-[var(--text-muted)] hover:text-white">
+      <a href={attachment.url} download={attachment.originalName} className="p-2 hover:bg-[var(--surface-soft-hover)] rounded-full transition-colors opacity-0 group-hover/att:opacity-100 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
         <Download className="w-4 h-4" />
       </a>
     </div>

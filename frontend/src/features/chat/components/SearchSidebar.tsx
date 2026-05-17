@@ -53,9 +53,17 @@ export function SearchSidebar({ onClose }: Props) {
           searchResults.map(msg => (
             <div key={msg.id} className="group p-3 rounded-lg border border-transparent hover:border-[var(--slack-border)] hover:bg-white dark:hover:bg-white/5 cursor-pointer transition-all">
                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-5 h-5 rounded bg-[#1164A3] flex items-center justify-center text-[10px] text-white font-black">
-                     {msg.sender?.name?.charAt(0).toUpperCase()}
-                  </div>
+                  {((msg.sender as any)?.avatarUrl || (msg.sender as any)?.avatar) ? (
+                    <img
+                      src={((msg.sender as any)?.avatarUrl || (msg.sender as any)?.avatar) as string}
+                      alt={msg.sender?.name || 'User'}
+                      className="w-5 h-5 rounded object-cover border border-white/10"
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded bg-[#1164A3] flex items-center justify-center text-[10px] text-white font-black">
+                       {msg.sender?.name?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <span className="font-black text-[13px]">{msg.sender?.name}</span>
                   <span className="text-[11px] text-[var(--slack-text-muted)] font-medium">
                      {format(new Date(msg.createdAt), 'MMM d, yyyy')}

@@ -1,5 +1,6 @@
 import { X, Check, Monitor, Sun, Moon } from 'lucide-react';
 import { useTheme, SLACK_THEMES } from '../../../contexts/ThemeProvider';
+import { ModalPortal } from '../../../components/ui';
 
 interface Props {
   isOpen: boolean;
@@ -12,8 +13,9 @@ export function ThemeSelector({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-[var(--slack-bg)] rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] border border-[var(--slack-border)]">
+    <ModalPortal>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="bg-[var(--slack-bg)] rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] border border-[var(--slack-border)]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--slack-border)]">
           <h2 className="text-xl font-black text-[var(--slack-text)]">Themes</h2>
           <button onClick={onClose} className="p-2 text-[var(--slack-text-muted)] hover:bg-gray-100 dark:hover:bg-white/5 rounded-md transition-colors">
@@ -89,7 +91,8 @@ export function ThemeSelector({ isOpen, onClose }: Props) {
             Done
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

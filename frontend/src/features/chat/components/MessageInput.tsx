@@ -11,6 +11,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import LinkExtension from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import './MessageInput.module.css';
+import { Tooltip } from '../../../components/ui';
 
 interface Props {
   onSend: (content: string, attachment?: File) => void;
@@ -160,7 +161,7 @@ export function MessageInput({
     <div className="p-2 md:p-3 bg-[var(--bg-base)] border-t border-[var(--border-subtle)]">
       <div className="w-full relative group">
         {/* Main Composer Box */}
-        <div className="glass-morphism rounded-xl border border-[var(--border-medium)] transition-all duration-300 group-focus-within:border-[var(--accent-primary)] overflow-hidden">
+        <div className="glass-morphism rounded-xl border border-[var(--border-medium)] transition-all duration-300 group-focus-within:border-[var(--accent-primary)] overflow-visible">
           
           {/* Formatting Toolbar */}
           <div className="flex items-center gap-0.5 px-2 py-1 border-b border-[var(--border-subtle)] bg-white/[0.02]">
@@ -244,7 +245,7 @@ export function MessageInput({
                       initial={{ opacity: 0, scale: 0.95, y: 10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                      className="absolute bottom-full left-0 mb-3 z-50 premium-shadow rounded-xl overflow-hidden border border-[var(--border-medium)]"
+                      className="absolute left-0 bottom-[calc(100%+0.5rem)] z-[120] premium-shadow rounded-xl overflow-hidden border border-[var(--border-medium)]"
                     >
                       <EmojiPicker 
                         onEmojiClick={onEmojiClick}
@@ -307,25 +308,27 @@ export function MessageInput({
 }
 
 const ToolbarButton = ({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) => (
-  <button 
-    onClick={onClick}
-    className={`p-1.5 rounded-lg transition-colors ${
-      active 
-        ? 'bg-[var(--accent-primary)] text-white' 
-        : 'hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-    }`} 
-    title={label}
-  >
-    {icon}
-  </button>
+  <Tooltip content={label}>
+    <button 
+      onClick={onClick}
+      className={`p-1.5 rounded-lg transition-colors ${
+        active 
+          ? 'bg-[var(--accent-primary)] text-white' 
+          : 'chat-icon-button chat-icon-button-muted hover:text-[var(--text-primary)]'
+      }`}
+    >
+      {icon}
+    </button>
+  </Tooltip>
 );
 
 const ActionButton = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick?: () => void }) => (
-  <button 
-    onClick={onClick}
-    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-[var(--text-secondary)] hover:text-white" 
-    title={label}
-  >
-    {icon}
-  </button>
+  <Tooltip content={label}>
+    <button 
+      onClick={onClick}
+      className="chat-icon-button p-2 rounded-xl"
+    >
+      {icon}
+    </button>
+  </Tooltip>
 );

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAppDispatch, useAppSelector } from '../../../redux/store';
 import { createWorkspace } from '../../../redux/workspace/workspaceThunks';
 import { InputField } from '../../../components/ui/InputField';
+import { ModalPortal } from '../../../components/ui';
 
 interface Props {
   isOpen: boolean;
@@ -27,9 +28,10 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <ModalPortal>
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -106,8 +108,9 @@ export function CreateWorkspaceModal({ isOpen, onClose }: Props) {
               </div>
             </form>
           </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+          </div>
+        )}
+      </AnimatePresence>
+    </ModalPortal>
   );
 }

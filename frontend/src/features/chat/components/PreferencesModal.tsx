@@ -21,6 +21,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme, SLACK_THEMES, type ThemeMode, type ThemePresetId } from '../../../contexts/ThemeProvider';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useAppDispatch, useAppSelector } from '../../../redux/store';
+import { ModalPortal } from '../../../components/ui';
 import {
   deleteWorkspace,
   fetchWorkspaceInvitations,
@@ -464,8 +465,9 @@ export function PreferencesModal({ isOpen, onClose, initialSection = 'appearance
   };
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+    <ModalPortal>
+      <AnimatePresence>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -520,8 +522,9 @@ export function PreferencesModal({ isOpen, onClose, initialSection = 'appearance
             </div>
           </section>
         </motion.div>
-      </div>
-    </AnimatePresence>
+        </div>
+      </AnimatePresence>
+    </ModalPortal>
   );
 }
 

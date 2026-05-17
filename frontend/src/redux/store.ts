@@ -1,4 +1,4 @@
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { configureStore } from '@reduxjs/toolkit';
 import { type TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import {
     persistReducer,
@@ -12,24 +12,13 @@ import {
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // localStorage
 
-import AuthReducer from './auth/authSlice';
-import chatReducer from './chat/chatSlice';
-import workspaceReducer from './workspace/workspaceSlice';
-import notificationReducer from './notifications/notificationSlice';
-
-// Combine reducers
-const rootReducer = combineReducers({
-    auth: AuthReducer,
-    chat: chatReducer,
-    workspace: workspaceReducer,
-    notifications: notificationReducer,
-});
+import { rootReducer } from './rootReducer';
 
 // Persist config
 const persistConfig = {
     key: 'root',
     storage,
-    whitelist: ['auth', 'workspace'],
+    whitelist: ['auth', 'workspace', 'chat'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

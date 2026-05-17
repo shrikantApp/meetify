@@ -10,6 +10,7 @@ import {
   updateWorkspaceMemberRole,
 } from '../../../redux/workspace/workspaceThunks';
 import type { WorkspaceRole } from '../../../services/workspaceApi';
+import { ModalPortal } from '../../../components/ui';
 
 export function WorkspaceSettingsPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const dispatch = useAppDispatch();
@@ -40,8 +41,9 @@ export function WorkspaceSettingsPanel({ isOpen, onClose }: { isOpen: boolean; o
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex justify-end bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-[460px] h-full bg-[var(--bg-card)] border-l border-[var(--border-subtle)] shadow-2xl overflow-y-auto">
+    <ModalPortal>
+      <div className="fixed inset-0 z-[110] flex justify-end bg-black/50 backdrop-blur-sm">
+        <div className="w-full max-w-[460px] h-full bg-[var(--bg-card)] border-l border-[var(--border-subtle)] shadow-2xl overflow-y-auto">
         <div className="sticky top-0 p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]/95 backdrop-blur flex items-center justify-between">
           <div>
             <h2 className="font-bold text-lg">{workspace.name}</h2>
@@ -149,7 +151,8 @@ export function WorkspaceSettingsPanel({ isOpen, onClose }: { isOpen: boolean; o
             </button>
           </section>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

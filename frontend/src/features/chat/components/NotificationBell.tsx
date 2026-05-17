@@ -43,7 +43,7 @@ export function NotificationBell() {
     <div className="relative">
       <button
         onClick={handleOpen}
-        className="relative p-2 hover:bg-white/10 rounded-lg transition-colors text-[var(--text-secondary)] hover:text-white"
+        className="chat-icon-button relative p-2 rounded-lg"
         title="Notifications"
       >
         <Bell className="w-4 h-4" />
@@ -63,13 +63,13 @@ export function NotificationBell() {
             </div>
             <div className="flex gap-1">
               <button
-                className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-muted)]"
+                className="chat-icon-button chat-icon-button-muted p-1.5 rounded-lg"
                 onClick={() => dispatch(markNotificationsRead(undefined))}
                 title="Mark all read"
               >
                 <CheckCheck className="w-4 h-4" />
               </button>
-              <button className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-muted)]" onClick={() => setOpen(false)}>
+              <button className="chat-icon-button chat-icon-button-muted p-1.5 rounded-lg" onClick={() => setOpen(false)}>
                 <X className="w-4 h-4" />
               </button>
             </div>

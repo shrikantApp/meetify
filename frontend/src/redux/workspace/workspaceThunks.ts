@@ -34,13 +34,14 @@ export const createWorkspace = createAsyncThunk(
 export const updateWorkspaceDetails = createAsyncThunk(
   "workspace/updateWorkspace",
   async (
-    payload: { workspaceId: string; name?: string; slug?: string },
+    payload: { workspaceId: string; name?: string; slug?: string; avatarUrl?: string | null },
     { rejectWithValue },
   ) => {
     try {
       return await workspaceApi.updateWorkspace(payload.workspaceId, {
         name: payload.name,
         slug: payload.slug,
+        avatarUrl: payload.avatarUrl,
       });
     } catch (error: any) {
       return rejectWithValue(

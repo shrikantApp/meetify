@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useAppSelector } from '../../../redux/store';
 import { selectPresence } from '../../../redux/chat/chatSelectors';
 import { Hash } from 'lucide-react';
@@ -40,6 +41,11 @@ export function ConversationItem({ conversation, active, onClick }: Props) {
 
   if (!name) name = 'Chat';
 
+  const directAvatarUrl =
+    conversation.type === 'direct'
+      ? ((otherMember?.user as any)?.avatarUrl || (otherMember?.user as any)?.avatar || null)
+      : null;
+
   const hasUnread = (conversation.unreadCount ?? 0) > 0;
   
   return (
@@ -63,12 +69,23 @@ export function ConversationItem({ conversation, active, onClick }: Props) {
           </div>
         ) : (
           <div className="relative">
-            <div className={`
-              w-7 h-7 rounded-lg premium-gradient flex items-center justify-center text-white text-[10px] font-bold shadow-sm
-              ${active ? 'ring-2 ring-[var(--accent-primary)] ring-offset-2 ring-offset-[var(--bg-sidebar)]' : ''}
-            `}>
-              {name.charAt(0).toUpperCase()}
-            </div>
+            {directAvatarUrl ? (
+              <img
+                src={directAvatarUrl}
+                alt={name}
+                className={`
+                  w-7 h-7 rounded-lg object-cover border border-white/10 shadow-sm
+                  ${active ? 'ring-2 ring-[var(--accent-primary)] ring-offset-2 ring-offset-[var(--bg-sidebar)]' : ''}
+                `}
+              />
+            ) : (
+              <div className={`
+                w-7 h-7 rounded-lg premium-gradient flex items-center justify-center text-white text-[10px] font-bold shadow-sm
+                ${active ? 'ring-2 ring-[var(--accent-primary)] ring-offset-2 ring-offset-[var(--bg-sidebar)]' : ''}
+              `}>
+                {name.charAt(0).toUpperCase()}
+              </div>
+            )}
             <span className={`
               absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border-2 border-[var(--bg-sidebar)]
               ${isOnline ? 'bg-emerald-500' : 'bg-gray-500'}

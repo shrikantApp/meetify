@@ -10,6 +10,11 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+const getUploadAuthHeaders = () => {
+  const token = localStorage.getItem('meetify_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export const chatApi = {
   // Conversations
   getConversations: (workspaceId?: string) =>
@@ -86,6 +91,16 @@ export const chatApi = {
     http.post('/uploads/presigned', { fileName, mimeType }).then((r) => r.data),
 
   uploadFileToMinio: async (url: string, file: File) => {
+    if (url.includes('/api/uploads/local/')) {
+      const formData = new FormData();
+      formData.append('file', file);
+      return axios.post(url, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...getUploadAuthHeaders(),
+        },
+      });
+    }
     return axios.put(url, file, {
       headers: {
         'Content-Type': file.type,

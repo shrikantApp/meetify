@@ -71,7 +71,7 @@ export function ThreadSidebar({ messageId, onClose }: Props) {
         </div>
         <button 
           onClick={onClose} 
-          className="p-1.5 hover:bg-white/10 rounded-xl transition-all text-[var(--text-muted)] hover:text-white"
+          className="chat-icon-button chat-icon-button-muted p-1.5 rounded-xl transition-all"
         >
           <X className="w-3.5 h-3.5" />
         </button>

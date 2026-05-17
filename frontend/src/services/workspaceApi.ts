@@ -11,10 +11,16 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+const getUploadAuthHeaders = () => {
+  const token = localStorage.getItem("meetify_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export interface Workspace {
   id: string;
   name: string;
   slug: string;
+  avatarUrl?: string | null;
   ownerId: string;
   currentUserRole?: WorkspaceRole;
   memberCount?: number;
@@ -83,10 +89,39 @@ export const workspaceApi = {
 
   updateWorkspace: async (
     id: string,
-    body: { name?: string; slug?: string },
+    body: { name?: string; slug?: string; avatarUrl?: string | null },
   ): Promise<Workspace> => {
     const response = await http.patch(`/workspaces/${id}`, body);
     return response.data;
+  },
+
+  getPresignedUrl: async (fileName: string, mimeType: string) => {
+    const response = await http.post('/uploads/presigned', { fileName, mimeType });
+    return response.data as {
+      url: string;
+      method: 'POST';
+      fieldName: 'file';
+      fileKey: string;
+      publicUrl: string;
+    };
+  },
+
+  uploadFileToMinio: async (url: string, file: File) => {
+    if (url.includes('/api/uploads/local/')) {
+      const formData = new FormData();
+      formData.append('file', file);
+      return axios.post(url, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...getUploadAuthHeaders(),
+        },
+      });
+    }
+    return axios.put(url, file, {
+      headers: {
+        'Content-Type': file.type,
+      },
+    });
   },
 
   deleteWorkspace: async (id: string): Promise<{ success: boolean }> => {

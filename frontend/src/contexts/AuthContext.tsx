@@ -1,17 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '../services/api';
-import { selectCurrentUser, selectUserProfile, setCurrentUser, setUserProfile } from '../redux/auth/authSlice';
+import { ApiError, api } from '../services/api';
+import { selectCurrentUser, selectUserProfile, setCurrentUser, setUserProfile, type UserProfile } from '../redux/auth/authSlice';
 import { useAppDispatch, useAppSelector } from '../redux/store';
-
-interface User {
-    id: string;
-    name: string;
-    email: string;
-}
+import { resetAppState } from '../redux/rootReducer';
 
 interface AuthContextType {
-    user: User | null;
+    user: UserProfile | null;
     token: string | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
@@ -31,6 +26,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const callStoreUserProfile = (data: any) => {
         dispatch(setUserProfile(data))
     }
+
+    const clearSession = () => {
+        localStorage.removeItem('meetify_token');
+        localStorage.removeItem('persist:root');
+        setToken(null);
+        dispatch(resetAppState());
+    };
+
     useEffect(() => {
         const persistedToken = currentUser?.access_token || null;
 
@@ -40,7 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             api.auth
                 .profile()
                 .then(callStoreUserProfile)
-                .catch(() => logout())
+                .catch((error) => {
+                    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+                        clearSession();
+                    }
+                })
                 .finally(() => setLoading(false));
         } else {
             setLoading(false);
@@ -66,10 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = () => {
-        localStorage.removeItem('meetify_token');
-        setToken(null);
-        dispatch(setCurrentUser({ access_token: '', token_type: '' }));
-        callStoreUserProfile(null);
+        clearSession();
     };
 
     return (
