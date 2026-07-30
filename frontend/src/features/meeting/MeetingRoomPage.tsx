@@ -112,7 +112,16 @@ export default function MeetingRoomPage() {
       setLobbyGate("lobby");
     };
 
-    const onRoomState = () => {
+    const onRoomState = (state: any) => {
+      console.log("state", state);
+      
+      // Safety net against old backend code: ignore premature room-state
+      // if the lobby is enabled, we are not the host, and we are not admitted yet.
+      if (meeting?.lobbyEnabled && !isHost && lobbyStatus !== "admitted") {
+        console.warn("Ignoring premature room-state. Still waiting for host.");
+        return;
+      }
+      
       setLobbyGate("direct");
     };
 
@@ -123,7 +132,7 @@ export default function MeetingRoomPage() {
       socket.off("lobby-waiting", onLobbyWaiting);
       socket.off("room-state", onRoomState);
     };
-  }, [socket]);
+  }, [socket, meeting?.lobbyEnabled, isHost, lobbyStatus]);
 
   // When admitted through lobby, transition gate
   useEffect(() => {

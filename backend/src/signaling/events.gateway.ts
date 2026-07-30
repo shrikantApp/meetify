@@ -37,6 +37,9 @@ import type {
 } from './lobby.types';
 import { DEFAULT_REQUEST_TTL, CLEANUP_INTERVAL } from './lobby.types';
 
+/** How long to keep room settings after the last participant leaves (30 min). */
+const ROOM_SETTINGS_TTL = 30 * 60 * 1000;
+
 // ── INTERNAL TYPES ───────────────────────────────────────────────────────────
 
 type MediaType = 'camera' | 'mic' | 'screen';
@@ -115,6 +118,12 @@ export class EventsGateway
   /** Handle for TTL cleanup interval. */
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
+  /** Deferred cleanup timers for room settings after room empties. roomId → timer handle. */
+  private readonly settingsCleanupTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -133,6 +142,11 @@ export class EventsGateway
 
   onModuleDestroy() {
     if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+    // Clear all deferred settings cleanup timers
+    for (const timer of this.settingsCleanupTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.settingsCleanupTimers.clear();
   }
 
   // ── LOGGING ──────────────────────────────────────────────────────────
@@ -196,10 +210,29 @@ export class EventsGateway
       // Auto sweep empty rooms
       if (Object.keys(room.participants).length === 0) {
         this.rooms.delete(targetRoomId);
-        this.roomSettings.delete(targetRoomId);
-        this.pendingRequests.delete(targetRoomId);
         this.auditLogs.delete(targetRoomId);
-        this.logDebug('room cleaned up (empty)', { roomId: targetRoomId });
+
+        // Defer deletion of roomSettings and pendingRequests so the lobby
+        // configuration survives when all participants temporarily leave.
+        const existingTimer = this.settingsCleanupTimers.get(targetRoomId);
+        if (existingTimer) clearTimeout(existingTimer);
+
+        const timer = setTimeout(() => {
+          // Only clean up if the room is still empty
+          if (!this.rooms.has(targetRoomId)) {
+            this.roomSettings.delete(targetRoomId);
+            this.pendingRequests.delete(targetRoomId);
+            this.settingsCleanupTimers.delete(targetRoomId);
+            this.logDebug('deferred settings cleanup complete', {
+              roomId: targetRoomId,
+            });
+          }
+        }, ROOM_SETTINGS_TTL);
+
+        this.settingsCleanupTimers.set(targetRoomId, timer);
+        this.logDebug('room emptied, settings kept for 30 min', {
+          roomId: targetRoomId,
+        });
       }
     }
 
@@ -368,6 +401,16 @@ export class EventsGateway
       });
     }
 
+    // Cancel any pending deferred cleanup since the room is active again
+    const pendingCleanup = this.settingsCleanupTimers.get(roomId);
+    if (pendingCleanup) {
+      clearTimeout(pendingCleanup);
+      this.settingsCleanupTimers.delete(roomId);
+      this.logDebug('deferred settings cleanup cancelled (room active)', {
+        roomId,
+      });
+    }
+
     const room = this.rooms.get(roomId)!;
 
     if (participant.mediaState.screen) {
@@ -508,7 +551,29 @@ export class EventsGateway
     }
     await this.removeParticipant(client, 'leave-room');
 
-    const settings = this.roomSettings.get(data.roomId);
+    let settings = this.roomSettings.get(data.roomId);
+
+    // If settings are not in memory yet, load them from the database
+    if (!settings) {
+      try {
+        const meeting = await this.meetingsService.findByCode(data.roomId);
+        if (meeting) {
+          settings = {
+            lobbyEnabled: meeting.lobbyEnabled,
+            locked: false,
+            hostSocketId: '',
+            hostUserId: meeting.host.id,
+            coHostSocketIds: new Set(),
+          };
+          this.roomSettings.set(data.roomId, settings);
+        }
+      } catch (e: any) {
+        this.logDebug('failed to fetch meeting from DB for join', {
+          error: e.message,
+        });
+      }
+    }
+
     const isHost = settings?.hostUserId === client.user.sub;
     const isCoHost = settings
       ? [...settings.coHostSocketIds].some(
@@ -537,6 +602,28 @@ export class EventsGateway
       // If host is joining, update their socketId in settings
       if (isHost && settings) {
         settings.hostSocketId = client.id;
+
+        // Emit any existing pending requests to the host so they see them immediately
+        const roomPending = this.pendingRequests.get(data.roomId);
+        if (roomPending) {
+          this.logDebug('host joined, sending pending requests', {
+            hostSocketId: client.id,
+            pendingCount: roomPending.size,
+          });
+          for (const req of roomPending.values()) {
+            client.emit('join-request-received', {
+              socketId: req.socketId,
+              userId: req.userId,
+              userName: req.userName,
+              mediaState: req.mediaState,
+              requestedAt: req.requestedAt,
+            });
+            this.logDebug('emitted join-request-received to host', {
+              socketId: req.socketId,
+              userName: req.userName,
+            });
+          }
+        }
       }
 
       return;
