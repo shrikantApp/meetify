@@ -1,17 +1,29 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Plus, Smile, Send, Mic, 
-  Paperclip, Bold, Italic, Link, List, ListOrdered, Code, AtSign, Underline as UnderlineIcon, Strikethrough
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import LinkExtension from '@tiptap/extension-link';
-import Underline from '@tiptap/extension-underline';
-import './MessageInput.module.css';
-import { Tooltip } from '../../../components/ui';
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Plus,
+  Smile,
+  Send,
+  Mic,
+  Paperclip,
+  Bold,
+  Italic,
+  Link,
+  List,
+  ListOrdered,
+  Code,
+  AtSign,
+  Underline as UnderlineIcon,
+  Strikethrough,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
+import LinkExtension from "@tiptap/extension-link";
+import Underline from "@tiptap/extension-underline";
+import "./MessageInput.module.css";
+import { Tooltip } from "../../../components/ui";
 
 interface Props {
   onSend: (content: string, attachment?: File) => void;
@@ -23,14 +35,14 @@ interface Props {
   disabled?: boolean;
 }
 
-export function MessageInput({ 
-  onSend, 
-  onTyping = () => {}, 
+export function MessageInput({
+  onSend,
+  onTyping = () => {},
   onCancel,
-  initialContent = '',
-  placeholder = 'Write a message...',
-  submitLabel = 'Send',
-  disabled 
+  initialContent = "",
+  placeholder = "Write a message...",
+  submitLabel = "Send",
+  disabled,
 }: Props) {
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -45,12 +57,12 @@ export function MessageInput({
       }),
       Placeholder.configure({
         placeholder,
-        emptyEditorClass: 'is-editor-empty',
+        emptyEditorClass: "is-editor-empty",
       }),
       LinkExtension.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: 'text-[var(--accent-primary)] underline',
+          class: "text-[var(--accent-primary)] underline",
         },
       }),
       Underline,
@@ -70,10 +82,22 @@ export function MessageInput({
     },
     editorProps: {
       attributes: {
-        class: 'focus:outline-none w-full bg-transparent text-[13px] md:text-sm p-2 min-h-[36px] max-h-[150px] overflow-y-auto leading-relaxed text-[var(--text-primary)] tiptap-editor',
+        class:
+          "focus:outline-none w-full bg-transparent text-[13px] md:text-sm p-2 min-h-[36px] max-h-[150px] overflow-y-auto leading-relaxed text-[var(--text-primary)] tiptap-editor",
       },
     },
   });
+
+  const style = {
+    bold: editor?.isActive("bold"),
+    italic: editor?.isActive("italic"),
+    underline: editor?.isActive("underline"),
+    strike: editor?.isActive("strike"),
+    bulletList: editor?.isActive("bulletList"),
+    orderedList: editor?.isActive("orderedList"),
+    codeBlock: editor?.isActive("codeBlock"),
+    link: editor?.isActive("link"),
+  };
 
   // We need a ref for the send handler to use inside the editor's keydown handler without closure issues
   const handleSendRef = useRef<() => void>(() => {});
@@ -84,7 +108,7 @@ export function MessageInput({
       const html = editor.getHTML();
       onSend(html);
       editor.commands.clearContent();
-      
+
       if (isTyping) {
         setIsTyping(false);
         onTyping(false);
@@ -103,22 +127,23 @@ export function MessageInput({
       editor.setOptions({
         editorProps: {
           attributes: {
-            class: 'focus:outline-none w-full bg-transparent text-[13px] md:text-sm p-2 min-h-[36px] max-h-[150px] overflow-y-auto leading-relaxed text-[var(--text-primary)] tiptap-editor',
+            class:
+              "focus:outline-none w-full bg-transparent text-[13px] md:text-sm p-2 min-h-[36px] max-h-[150px] overflow-y-auto leading-relaxed text-[var(--text-primary)] tiptap-editor",
           },
           handleKeyDown: (_view, event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               handleSendRef.current?.();
               return true;
             }
-            if (event.key === 'Escape' && onCancel) {
+            if (event.key === "Escape" && onCancel) {
               event.preventDefault();
               onCancel();
               return true;
             }
             return false;
-          }
-        }
+          },
+        },
       });
     }
   }, [editor, onCancel]);
@@ -126,12 +151,15 @@ export function MessageInput({
   // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node)
+      ) {
         setShowEmojiPicker(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const onEmojiClick = (emojiData: any) => {
@@ -142,15 +170,15 @@ export function MessageInput({
 
   const handleLink = () => {
     if (!editor) return;
-    const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('URL', previousUrl);
-    
+    const previousUrl = editor.getAttributes("link").href;
+    const url = window.prompt("URL", previousUrl);
+
     if (url === null) return; // cancelled
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    if (url === "") {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   };
 
   if (!editor) {
@@ -162,65 +190,67 @@ export function MessageInput({
       <div className="w-full relative group">
         {/* Main Composer Box */}
         <div className="glass-morphism rounded-xl border border-[var(--border-medium)] transition-all duration-300 group-focus-within:border-[var(--accent-primary)] overflow-visible">
-          
           {/* Formatting Toolbar */}
           <div className="flex items-center gap-0.5 px-2 py-1 border-b border-[var(--border-subtle)] bg-white/[0.02]">
-            <ToolbarButton 
-              icon={<Bold className="w-3.5 h-3.5" />} 
-              label="Bold" 
-              active={editor.isActive('bold')}
-              onClick={() => editor.chain().focus().toggleBold().run()} 
+            <ToolbarButton
+              icon={<Bold className="w-3.5 h-3.5" />}
+              label="Bold"
+              active={editor.isActive("bold")}
+              onClick={() => editor.chain().focus().toggleBold().run()}
             />
-            <ToolbarButton 
-              icon={<Italic className="w-3.5 h-3.5" />} 
-              label="Italic" 
-              active={editor.isActive('italic')}
-              onClick={() => editor.chain().focus().toggleItalic().run()} 
+            <ToolbarButton
+              icon={<Italic className="w-3.5 h-3.5" />}
+              label="Italic"
+              active={editor.isActive("italic")}
+              onClick={() => editor.chain().focus().toggleItalic().run()}
             />
-            <ToolbarButton 
-              icon={<Strikethrough className="w-3.5 h-3.5" />} 
-              label="Strikethrough" 
-              active={editor.isActive('strike')}
-              onClick={() => editor.chain().focus().toggleStrike().run()} 
+            <ToolbarButton
+              icon={<Strikethrough className="w-3.5 h-3.5" />}
+              label="Strikethrough"
+              active={editor.isActive("strike")}
+              onClick={() => editor.chain().focus().toggleStrike().run()}
             />
-            <ToolbarButton 
-              icon={<UnderlineIcon className="w-3.5 h-3.5" />} 
-              label="Underline" 
-              active={editor.isActive('underline')}
-              onClick={() => editor.chain().focus().toggleUnderline().run()} 
-            />
-            <div className="w-px h-3 bg-[var(--border-subtle)] mx-1" />
-            <ToolbarButton 
-              icon={<Link className="w-3.5 h-3.5" />} 
-              label="Link" 
-              active={editor.isActive('link')}
-              onClick={handleLink} 
+            <ToolbarButton
+              icon={<UnderlineIcon className="w-3.5 h-3.5" />}
+              label="Underline"
+              active={editor.isActive("underline")}
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
             />
             <div className="w-px h-3 bg-[var(--border-subtle)] mx-1" />
-            <ToolbarButton 
-              icon={<List className="w-3.5 h-3.5" />} 
-              label="Bullet List" 
-              active={editor.isActive('bulletList')}
-              onClick={() => editor.chain().focus().toggleBulletList().run()} 
-            />
-            <ToolbarButton 
-              icon={<ListOrdered className="w-3.5 h-3.5" />} 
-              label="Numbered List" 
-              active={editor.isActive('orderedList')}
-              onClick={() => editor.chain().focus().toggleOrderedList().run()} 
+            <ToolbarButton
+              icon={<Link className="w-3.5 h-3.5" />}
+              label="Link"
+              active={editor.isActive("link")}
+              onClick={handleLink}
             />
             <div className="w-px h-3 bg-[var(--border-subtle)] mx-1" />
-            <ToolbarButton 
-              icon={<Code className="w-3.5 h-3.5" />} 
-              label="Code Block" 
-              active={editor.isActive('codeBlock')}
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()} 
+            <ToolbarButton
+              icon={<List className="w-3.5 h-3.5" />}
+              label="Bullet List"
+              active={editor.isActive("bulletList")}
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+            />
+            <ToolbarButton
+              icon={<ListOrdered className="w-3.5 h-3.5" />}
+              label="Numbered List"
+              active={editor.isActive("orderedList")}
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            />
+            <div className="w-px h-3 bg-[var(--border-subtle)] mx-1" />
+            <ToolbarButton
+              icon={<Code className="w-3.5 h-3.5" />}
+              label="Code Block"
+              active={editor.isActive("codeBlock")}
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
             />
           </div>
 
           {/* Text Area (TipTap) */}
-          <div className="p-1 cursor-text" onClick={() => editor.commands.focus()}>
-            <EditorContent editor={editor} />
+          <div
+            className="p-1 cursor-text "
+            onClick={() => editor.commands.focus()}
+          >
+            <EditorContent editor={editor} className="prose max-w-none" />
           </div>
 
           {/* Bottom Actions */}
@@ -228,26 +258,26 @@ export function MessageInput({
             <div className="flex items-center gap-0.5">
               <ActionButton icon={<Plus className="w-4 h-4" />} label="Add" />
               <div className="w-px h-3 bg-[var(--border-subtle)] mx-1" />
-              <ActionButton 
-                icon={<Paperclip className="w-4 h-4" />} 
-                label="Attach file" 
+              <ActionButton
+                icon={<Paperclip className="w-4 h-4" />}
+                label="Attach file"
                 onClick={() => fileInputRef.current?.click()}
               />
               <div className="relative" ref={emojiPickerRef}>
-                <ActionButton 
-                  icon={<Smile className="w-4 h-4" />} 
-                  label="Emoji" 
+                <ActionButton
+                  icon={<Smile className="w-4 h-4" />}
+                  label="Emoji"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 />
                 <AnimatePresence>
                   {showEmojiPicker && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, scale: 0.95, y: 10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: 10 }}
                       className="absolute left-0 bottom-[calc(100%+0.5rem)] z-[120] premium-shadow rounded-xl overflow-hidden border border-[var(--border-medium)]"
                     >
-                      <EmojiPicker 
+                      <EmojiPicker
                         onEmojiClick={onEmojiClick}
                         theme={EmojiTheme.DARK}
                         skinTonesDisabled
@@ -259,7 +289,10 @@ export function MessageInput({
                   )}
                 </AnimatePresence>
               </div>
-              <ActionButton icon={<AtSign className="w-4 h-4" />} label="Mention" />
+              <ActionButton
+                icon={<AtSign className="w-4 h-4" />}
+                label="Mention"
+              />
               <ActionButton icon={<Mic className="w-4 h-4" />} label="Voice" />
             </div>
 
@@ -270,18 +303,22 @@ export function MessageInput({
               disabled={editor.isEmpty || disabled}
               className={`
                 flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold text-[13px] transition-all duration-300
-                ${!editor.isEmpty && !disabled
-                  ? 'premium-gradient text-white shadow-lg shadow-[var(--accent-primary)]/25' 
-                  : 'bg-white/5 text-[var(--text-muted)] cursor-not-allowed'}
+                ${
+                  !editor.isEmpty && !disabled
+                    ? "premium-gradient text-white shadow-lg shadow-[var(--accent-primary)]/25"
+                    : "bg-white/5 text-[var(--text-muted)] cursor-not-allowed"
+                }
               `}
             >
               <span>{submitLabel}</span>
-              {submitLabel === 'Send' && (
-                <Send className={`w-3.5 h-3.5 transition-transform duration-300 ${!editor.isEmpty ? 'translate-x-0.5 -translate-y-0.5' : ''}`} />
+              {submitLabel === "Send" && (
+                <Send
+                  className={`w-3.5 h-3.5 transition-transform duration-300 ${!editor.isEmpty ? "translate-x-0.5 -translate-y-0.5" : ""}`}
+                />
               )}
             </motion.button>
             {onCancel && (
-              <button 
+              <button
                 onClick={onCancel}
                 className="px-4 py-1.5 text-[13px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
@@ -292,29 +329,38 @@ export function MessageInput({
         </div>
 
         {/* Hidden File Input */}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) onSend('', file);
+            if (file) onSend("", file);
           }}
         />
-
       </div>
     </div>
   );
 }
 
-const ToolbarButton = ({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) => (
+const ToolbarButton = ({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+}) => (
   <Tooltip content={label}>
-    <button 
+    <button
       onClick={onClick}
       className={`p-1.5 rounded-lg transition-colors ${
-        active 
-          ? 'bg-[var(--accent-primary)] text-white' 
-          : 'chat-icon-button chat-icon-button-muted hover:text-[var(--text-primary)]'
+        active
+          ? "bg-[var(--accent-primary)] text-white"
+          : "chat-icon-button chat-icon-button-muted hover:text-[var(--text-primary)]"
       }`}
     >
       {icon}
@@ -322,12 +368,17 @@ const ToolbarButton = ({ icon, label, active, onClick }: { icon: React.ReactNode
   </Tooltip>
 );
 
-const ActionButton = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick?: () => void }) => (
+const ActionButton = ({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+}) => (
   <Tooltip content={label}>
-    <button 
-      onClick={onClick}
-      className="chat-icon-button p-2 rounded-xl"
-    >
+    <button onClick={onClick} className="chat-icon-button p-2 rounded-xl">
       {icon}
     </button>
   </Tooltip>

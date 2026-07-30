@@ -38,6 +38,7 @@
   --bg-base: var(--slack-bg, #0b0d13);
   --bg-sidebar: var(--slack-sidebar, #12151f);
   --bg-workspace: var(--slack-sidebar, #08090d);
+  --bg-card-body: rgba(23, 27, 41);
   --bg-card: rgba(23, 27, 41, 0.4);
   --bg-card-hover: rgba(31, 37, 64, 0.6);
   --surface-soft: rgba(255, 255, 255, 0.05);
@@ -1978,7 +1979,7 @@ body {
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  background: var(--bg-card);
+  background: var(--bg-card-body);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.5rem;
