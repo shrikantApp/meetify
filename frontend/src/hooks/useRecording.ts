@@ -779,7 +779,6 @@ export function useRecording({
                         maxContentLength: Infinity,
                         maxBodyLength: Infinity
                     });
-                    console.log('[Recording] Uploaded successfully');
                 } catch (err: any) {
                     console.error('[Recording] Upload failed', err);
                     setError(err.response?.data?.message || 'Failed to upload recording to server.');

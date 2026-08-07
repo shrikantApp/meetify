@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -18,6 +19,11 @@ import {
   Users,
   MessageSquare,
   X,
+  Paperclip,
+  Download,
+  FileText,
+  Lock,
+  Send,
 } from "lucide-react";
 import MeetingControls from "./components/MeetingControls";
 import VideoTile from "./components/VideoTile";
@@ -26,9 +32,18 @@ import ParticipantControlModal from "./components/ParticipantControlModal";
 import { useRecording } from "../../hooks/useRecording";
 
 interface ChatMessage {
+  id?: string;
   message: string;
   userName: string;
+  senderId?: string;
+  senderSocketId?: string;
   timestamp: string;
+  type?: "text" | "file" | "image" | "system" | "code";
+  fileUrl?: string;
+  fileType?: string;
+  recipientSocketId?: string;
+  recipientUserId?: string;
+  channel?: "everyone" | "host-only" | "direct";
 }
 
 interface MeetingInfo {
@@ -90,7 +105,7 @@ export default function MeetingRoomPage() {
     denyRequest,
     bulkApprove,
     hostAction,
-    configureRoom,
+
     latestRequest,
     dismissToast,
   } = useLobby({
@@ -113,15 +128,13 @@ export default function MeetingRoomPage() {
     };
 
     const onRoomState = (state: any) => {
-      console.log("state", state);
-      
       // Safety net against old backend code: ignore premature room-state
       // if the lobby is enabled, we are not the host, and we are not admitted yet.
       if (meeting?.lobbyEnabled && !isHost && lobbyStatus !== "admitted") {
         console.warn("Ignoring premature room-state. Still waiting for host.");
         return;
       }
-      
+
       setLobbyGate("direct");
     };
 
@@ -148,7 +161,7 @@ export default function MeetingRoomPage() {
     !meeting?.lobbyEnabled ||
     lobbyStatus === "admitted";
 
-  const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
+  const [activeSpeakerId] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState<
     "participants" | "chat" | "lobby" | null
   >(null);
@@ -287,7 +300,6 @@ export default function MeetingRoomPage() {
       | "grid",
     spotlightId: spotlightTileId,
     localCameraStream,
-    activeSpeakerId,
   });
 
   const handleToggleRecording = () => {
@@ -331,9 +343,17 @@ export default function MeetingRoomPage() {
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [chatTarget, setChatTarget] = useState<string>("everyone");
+  const [chatPermission, setChatPermission] = useState<
+    "everyone" | "host-only" | "disabled"
+  >("everyone");
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-show sidebar when participants > 4
   useEffect(() => {
@@ -343,56 +363,77 @@ export default function MeetingRoomPage() {
     }
   }, [peers.length]);
 
-  // Active speaker logic: priority to screen sharer, then current talker (mic on), then local if talking
+  // Reset unread count when opening chat tab
   useEffect(() => {
-    const screenSharer = peers.find(
-      (p: any) => peerMediaStates[p.socketId]?.screen,
-    );
-    if (screenSharer) {
-      setActiveSpeakerId(screenSharer.socketId);
-    } else {
-      // Priority: Peer with mic on > Local with mic on > First Peer > Local
-      const peerSpeaker = peers.find(
-        (p: any) => peerMediaStates[p.socketId]?.mic,
-      );
-      if (peerSpeaker) {
-        setActiveSpeakerId(peerSpeaker.socketId);
-      } else if (isMicOn) {
-        setActiveSpeakerId("local");
-      } else if (peers.length > 0) {
-        setActiveSpeakerId(peers[0].socketId);
-      } else {
-        setActiveSpeakerId("local");
-      }
+    if (showSidebar && sidebarTab === "chat") {
+      setUnreadChatCount(0);
     }
-  }, [peers, peerMediaStates, isMicOn, isCamOn, isScreenSharing]);
+  }, [showSidebar, sidebarTab]);
 
-  // Join room + configure (host sends lobby config)
+  // Fetch persistent meeting chat history on join
   useEffect(() => {
-    if (!socket || !meeting) return;
+    if (!meetingCode || !admitted) return;
+    const token = localStorage.getItem("token");
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+    fetch(`${apiUrl}/meetings/${meetingCode}/messages`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const formatted: ChatMessage[] = data.map((m: any) => ({
+            id: m.id,
+            userName: m.senderName || "Participant",
+            senderId: m.senderId,
+            message: m.content,
+            timestamp: m.createdAt,
+            type: m.type,
+            fileUrl: m.fileUrl,
+            fileType: m.fileType,
+            recipientUserId: m.recipientUserId,
+            channel: m.channel,
+          }));
+          setChatMessages(formatted);
+        }
+      })
+      .catch((err) => console.error("Failed to fetch chat history:", err));
+  }, [meetingCode, admitted]);
 
-    if (isHost) {
-      // Host configures room settings before joining
-      configureRoom(meeting.lobbyEnabled);
-    }
+  // Scroll to bottom of chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
-    joinRoom({
-      camera: isCamOn,
-      mic: isMicOn,
-    });
-  }, [socket, meeting, isHost, joinRoom, configureRoom]);
-
-  // Chat messages from socket
+  // Chat messages & permission listeners from socket
   useEffect(() => {
     if (!socket) return;
     const handler = (msg: ChatMessage) => {
       setChatMessages((prev) => [...prev, msg]);
+      if (!showSidebar || sidebarTab !== "chat") {
+        setUnreadChatCount((count) => count + 1);
+      }
     };
+
+    const roomStatePermHandler = (state: any) => {
+      if (state.chatPermission) setChatPermission(state.chatPermission);
+    };
+
+    const permChangeHandler = (data: {
+      chatPermission: "everyone" | "host-only" | "disabled";
+    }) => {
+      if (data.chatPermission) setChatPermission(data.chatPermission);
+    };
+
     socket.on("chat-message", handler);
+    socket.on("room-state", roomStatePermHandler);
+    socket.on("chat-permission-changed", permChangeHandler);
+
     return () => {
       socket.off("chat-message", handler);
+      socket.off("room-state", roomStatePermHandler);
+      socket.off("chat-permission-changed", permChangeHandler);
     };
-  }, [socket]);
+  }, [socket, showSidebar, sidebarTab]);
 
   // Host action applied listener
   useEffect(() => {
@@ -402,8 +443,6 @@ export default function MeetingRoomPage() {
       reason?: string;
       targetSocketId?: string;
     }) => {
-      console.log("data.action", data.action);
-
       switch (data.action) {
         case "mute-all":
           // Handled by hook's force-mute listener
@@ -451,17 +490,6 @@ export default function MeetingRoomPage() {
 
   // ── Actions ──────────────────────────────────────────────────────────
 
-  const sendChat = () => {
-    if (chatInput.trim() && socket) {
-      socket.emit("chat-message", {
-        roomId: meetingCode,
-        message: chatInput.trim(),
-        userName: user?.name || "Guest",
-      });
-      setChatInput("");
-    }
-  };
-
   const handleLeave = () => {
     leaveRoom();
     navigate("/dashboard");
@@ -472,6 +500,85 @@ export default function MeetingRoomPage() {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const sendChat = (
+    fileUrl?: string,
+    fileType?: string,
+    messageType?: "text" | "image" | "file",
+  ) => {
+    if ((!chatInput.trim() && !fileUrl) || !socket) return;
+
+    const payload: any = {
+      roomId: meetingCode,
+      message: chatInput.trim(),
+      userName: user?.name || "Guest",
+      type:
+        messageType ||
+        (fileUrl
+          ? fileType?.startsWith("image/")
+            ? "image"
+            : "file"
+          : "text"),
+      fileUrl,
+      fileType,
+    };
+
+    if (chatTarget === "host-only") {
+      payload.channel = "host-only";
+    } else if (chatTarget !== "everyone") {
+      payload.recipientSocketId = chatTarget;
+      payload.channel = "direct";
+    } else {
+      payload.channel = "everyone";
+    }
+
+    socket.emit("chat-message", payload);
+    setChatInput("");
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingFile(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      const apiUrl =
+        import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+
+      const presignedRes = await fetch(`${apiUrl}/uploads/presigned`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+        }),
+      });
+      const presignedData = await presignedRes.json();
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await fetch(presignedData.url, {
+        method: presignedData.method || "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      const publicUrl = uploadData.publicUrl || presignedData.publicUrl;
+
+      const isImage = file.type.startsWith("image/");
+      sendChat(publicUrl, file.type, isImage ? "image" : "file");
+    } catch (err) {
+      console.error("File upload failed:", err);
+    } finally {
+      setIsUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const toggleHand = useCallback(() => {
@@ -1069,16 +1176,59 @@ export default function MeetingRoomPage() {
 
               {sidebarTab === "chat" && (
                 <div className="flex flex-col h-full">
+                  {/* Recipient / Channel Selection */}
+                  <div className="mb-3 flex items-center justify-between bg-white/5 p-2 rounded-xl border border-white/5 text-xs">
+                    <span className="text-white/40 font-bold">To:</span>
+                    <select
+                      value={chatTarget}
+                      onChange={(e) => setChatTarget(e.target.value)}
+                      className="bg-transparent text-white font-bold outline-none cursor-pointer text-xs"
+                    >
+                      <option
+                        value="everyone"
+                        className="bg-neutral-900 text-white"
+                      >
+                        Everyone
+                      </option>
+                      <option
+                        value="host-only"
+                        className="bg-neutral-900 text-white"
+                      >
+                        Host Only
+                      </option>
+                      {peers.map((p) => (
+                        <option
+                          key={p.socketId}
+                          value={p.socketId}
+                          className="bg-neutral-900 text-white"
+                        >
+                          Direct: {p.userName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Messages list */}
                   <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
                     {chatMessages.map((msg, i) => (
                       <div
-                        key={i}
-                        className={`flex flex-col gap-1.5 ${msg.userName === user?.name ? "items-end" : "items-start"} max-w-[90%]`}
+                        key={msg.id || i}
+                        className={`flex flex-col gap-1.5 ${msg.userName === user?.name ? "items-end" : "items-start"} max-w-[92%]`}
                       >
                         <div className="flex items-center gap-2 px-1">
                           <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">
                             {msg.userName}
                           </span>
+                          {msg.channel === "direct" && (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">
+                              🔒 Direct
+                            </span>
+                          )}
+                          {msg.channel === "host-only" && (
+                            <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-full font-bold">
+                              📢 Host Only
+                            </span>
+                          )}
                           <span className="text-[9px] text-white/20 font-medium">
                             {new Date(msg.timestamp).toLocaleTimeString([], {
                               hour: "2-digit",
@@ -1086,29 +1236,100 @@ export default function MeetingRoomPage() {
                             })}
                           </span>
                         </div>
+
+                        {/* Content / Media Rendering */}
                         <div
                           className={`px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-lg ${msg.userName === user?.name ? "bg-accent text-white rounded-tr-none shadow-accent/20" : "glass-panel !bg-white/5 text-white/90 rounded-tl-none border-white/10"}`}
                         >
-                          {msg.message}
+                          {msg.type === "image" && msg.fileUrl ? (
+                            <div className="flex flex-col gap-1.5">
+                              <img
+                                src={msg.fileUrl}
+                                alt="Attachment"
+                                className="max-w-full max-h-48 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-all border border-white/10"
+                                onClick={() =>
+                                  window.open(msg.fileUrl, "_blank")
+                                }
+                              />
+                              {msg.message && <p>{msg.message}</p>}
+                            </div>
+                          ) : msg.type === "file" && msg.fileUrl ? (
+                            <div className="flex flex-col gap-1.5">
+                              <a
+                                href={msg.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download
+                                className="flex items-center gap-2 p-2 bg-black/20 hover:bg-black/30 rounded-xl transition-all border border-white/10 text-xs font-semibold"
+                              >
+                                <FileText size={16} className="text-accent" />
+                                <span className="truncate max-w-[150px]">
+                                  {msg.message || "Download File"}
+                                </span>
+                                <Download
+                                  size={14}
+                                  className="ml-auto opacity-60"
+                                />
+                              </a>
+                            </div>
+                          ) : (
+                            <p>{msg.message}</p>
+                          )}
                         </div>
                       </div>
                     ))}
+                    <div ref={messagesEndRef} />
                   </div>
-                  <div className="mt-4 flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/5 focus-within:border-accent/50 transition-all">
-                    <input
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Send message"
-                      className="flex-1 bg-transparent border-none outline-none text-sm px-2 text-white placeholder:text-white/20"
-                      onKeyDown={(e) => e.key === "Enter" && sendChat()}
-                    />
-                    <button
-                      onClick={sendChat}
-                      className="p-2 bg-accent text-white rounded-xl shadow-lg shadow-accent/40 active:scale-95 transition-all"
-                    >
-                      <MessageSquare size={16} />
-                    </button>
-                  </div>
+
+                  {/* Input area */}
+                  {chatPermission === "disabled" && !isHost ? (
+                    <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl text-xs font-bold text-center">
+                      Chat has been disabled by the host.
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex flex-col gap-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <div className="flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/5 focus-within:border-accent/50 transition-all">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingFile}
+                          className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-all disabled:opacity-50"
+                          title="Attach file or image"
+                        >
+                          <Paperclip size={16} />
+                        </button>
+                        <input
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          placeholder={
+                            isUploadingFile
+                              ? "Uploading file..."
+                              : chatTarget === "host-only"
+                                ? "Message host & co-hosts..."
+                                : chatTarget !== "everyone"
+                                  ? "Direct message..."
+                                  : "Send message..."
+                          }
+                          disabled={isUploadingFile}
+                          className="flex-1 bg-transparent border-none outline-none text-sm px-1 text-white placeholder:text-white/20 disabled:opacity-50"
+                          onKeyDown={(e) => e.key === "Enter" && sendChat()}
+                        />
+                        <button
+                          onClick={() => sendChat()}
+                          disabled={isUploadingFile || !chatInput.trim()}
+                          className="p-2 bg-accent text-white rounded-xl shadow-lg shadow-accent/40 active:scale-95 transition-all disabled:opacity-40"
+                        >
+                          <Send size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

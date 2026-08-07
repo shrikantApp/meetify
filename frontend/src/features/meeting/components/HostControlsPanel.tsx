@@ -24,12 +24,14 @@ interface Participant {
 interface HostControlsPanelProps {
     participants: Participant[];
     isLocked: boolean;
-    onAction: (action: string, targetSocketId?: string) => void;
+    chatPermission?: 'everyone' | 'host-only' | 'disabled';
+    onAction: (action: string, targetSocketId?: string, chatPermission?: 'everyone' | 'host-only' | 'disabled') => void;
 }
 
 export default function HostControlsPanel({
     participants,
     isLocked,
+    chatPermission = 'everyone',
     onAction,
 }: HostControlsPanelProps) {
     const [open, setOpen] = useState(false);
@@ -70,6 +72,29 @@ export default function HostControlsPanel({
                         {isLocked ? <Unlock size={16} /> : <Lock size={16} />}
                         <span>{isLocked ? 'Unlock meeting' : 'Lock meeting'}</span>
                     </button>
+
+                    <div className="hc-divider" />
+                    <div className="hc-section-label">Chat Permissions</div>
+                    <div className="px-3 py-1.5 flex flex-col gap-1">
+                      <button
+                        className={`text-xs px-2 py-1 rounded-lg text-left transition-all ${chatPermission === 'everyone' ? 'bg-accent text-white font-bold' : 'text-white/60 hover:bg-white/5'}`}
+                        onClick={() => onAction('set-chat-permission', undefined, 'everyone')}
+                      >
+                        Everyone can chat
+                      </button>
+                      <button
+                        className={`text-xs px-2 py-1 rounded-lg text-left transition-all ${chatPermission === 'host-only' ? 'bg-accent text-white font-bold' : 'text-white/60 hover:bg-white/5'}`}
+                        onClick={() => onAction('set-chat-permission', undefined, 'host-only')}
+                      >
+                        Host only chat
+                      </button>
+                      <button
+                        className={`text-xs px-2 py-1 rounded-lg text-left transition-all ${chatPermission === 'disabled' ? 'bg-accent text-white font-bold' : 'text-white/60 hover:bg-white/5'}`}
+                        onClick={() => onAction('set-chat-permission', undefined, 'disabled')}
+                      >
+                        Disable chat
+                      </button>
+                    </div>
 
                     <div className="hc-divider" />
 

@@ -1,19 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Compass, Settings } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { CreateWorkspaceModal } from './CreateWorkspaceModal';
-import { PreferencesModal } from './PreferencesModal';
-import { useAppDispatch, useAppSelector } from '../../../redux/store';
-import { fetchWorkspaces } from '../../../redux/workspace/workspaceThunks';
-import { setActiveWorkspace } from '../../../redux/workspace/workspaceSlice';
-import { Tooltip } from '../../../components/ui';
+import React, { useState, useEffect } from "react";
+import { Plus, Compass, Settings } from "lucide-react";
+import { motion } from "framer-motion";
+import { CreateWorkspaceModal } from "./CreateWorkspaceModal";
+import { PreferencesModal } from "./PreferencesModal";
+import { useAppDispatch, useAppSelector } from "../../../redux/store";
+import { fetchWorkspaces } from "../../../redux/workspace/workspaceThunks";
+import { setActiveWorkspace } from "../../../redux/workspace/workspaceSlice";
+import { Tooltip } from "../../../components/ui";
 
 export const WorkspaceSidebar = () => {
-  const [preferencesSection, setPreferencesSection] = useState<'appearance' | 'workspace'>('appearance');
+  const [preferencesSection, setPreferencesSection] = useState<
+    "appearance" | "workspace"
+  >("appearance");
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const dispatch = useAppDispatch();
-  const { workspaces, activeWorkspaceId } = useAppSelector(state => state.workspace);
+  const { workspaces, activeWorkspaceId } = useAppSelector(
+    (state) => state.workspace,
+  );
 
   useEffect(() => {
     dispatch(fetchWorkspaces());
@@ -50,7 +54,7 @@ export const WorkspaceSidebar = () => {
           label="Themes"
           ghost
           onClick={() => {
-            setPreferencesSection('appearance');
+            setPreferencesSection("appearance");
             setIsPreferencesOpen(true);
           }}
         />
@@ -60,7 +64,7 @@ export const WorkspaceSidebar = () => {
           label="Workspace Settings"
           ghost
           onClick={() => {
-            setPreferencesSection('workspace');
+            setPreferencesSection("workspace");
             setIsPreferencesOpen(true);
           }}
         />
@@ -71,7 +75,10 @@ export const WorkspaceSidebar = () => {
         initialSection={preferencesSection}
         onClose={() => setIsPreferencesOpen(false)}
       />
-      <CreateWorkspaceModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+      <CreateWorkspaceModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
     </div>
   );
 };
@@ -87,7 +94,16 @@ interface WorkspaceIconProps {
   onClick?: () => void;
 }
 
-const WorkspaceIcon = ({ icon, label, initials, active, color, avatarUrl, ghost, onClick }: WorkspaceIconProps) => {
+const WorkspaceIcon = ({
+  icon,
+  label,
+  initials,
+  active,
+  color,
+  avatarUrl,
+  ghost,
+  onClick,
+}: WorkspaceIconProps) => {
   return (
     <Tooltip content={label} side="right" offset={16}>
       <div
@@ -95,23 +111,27 @@ const WorkspaceIcon = ({ icon, label, initials, active, color, avatarUrl, ghost,
         onClick={onClick}
       >
         {active && (
-          <div className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-[3px] h-8 bg-white rounded-r-full" />
+          <div className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-[3px] h-8 bg-[var(--accent-primary)] rounded-r-full" />
         )}
 
         <motion.div
-          whileHover={{ borderRadius: active ? '10px' : '14px' }}
+          whileHover={{ borderRadius: active ? "10px" : "14px" }}
           transition={{ duration: 0.2 }}
           className={`
             w-10 h-10 flex items-center justify-center transition-all duration-200 overflow-hidden
-            ${active ? 'rounded-[10px] premium-gradient text-white shadow-lg' : 'rounded-[20px]'}
-            ${ghost ? 'bg-[var(--surface-soft)] text-[var(--text-secondary)] hover:bg-[var(--accent-primary)] hover:text-white' : ''}
-            ${!active && !ghost ? (color || 'bg-[var(--surface-soft)]') + ' text-[var(--text-primary)] hover:bg-[var(--accent-primary)] hover:text-white' : ''}
+            ${active ? "rounded-[10px] premium-gradient text-white shadow-lg" : "rounded-[20px]"}
+            ${ghost ? "bg-[var(--surface-soft)] text-[var(--slack-sidebar-text)] hover:bg-[var(--accent-primary)] hover:text-white" : ""}
+            ${!active && !ghost ? (color || "bg-[var(--surface-soft)]") + " text-[var(--text-primary)] hover:bg-[var(--accent-primary)] hover:text-white" : ""}
           `}
         >
           {icon ? (
             icon
           ) : avatarUrl ? (
-            <img src={avatarUrl} alt={label} className="w-full h-full object-cover" />
+            <img
+              src={avatarUrl}
+              alt={label}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <span className="font-bold text-base">{initials}</span>
           )}

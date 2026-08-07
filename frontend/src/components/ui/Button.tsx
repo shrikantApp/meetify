@@ -1,35 +1,31 @@
-import React from 'react';
-import styles from './Button.module.css';
+import React from "react";
+import styles from "./Button.module.css";
 
 interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg' | 'icon';
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "slack";
+  size?: "sm" | "md" | "lg" | "icon";
   isLoading?: boolean;
 }
 
-export const Button: React.FC<Props> = ({ 
-  children, 
-  variant = 'primary', 
-  size = 'md', 
-  isLoading, 
-  className = '', 
+export const Button: React.FC<Props> = ({
+  children,
+  variant = "primary",
+  size = "md",
+  isLoading,
+  className = "",
   disabled,
-  ...props 
+  ...props
 }) => {
   const buttonClass = `
     ${styles.button} 
     ${styles[variant]} 
     ${styles[size]} 
-    ${isLoading ? styles.loading : ''} 
+    ${isLoading ? styles.loading : ""} 
     ${className}
   `.trim();
 
   return (
-    <button 
-      className={buttonClass} 
-      disabled={disabled || isLoading} 
-      {...props}
-    >
+    <button className={buttonClass} disabled={disabled || isLoading} {...props}>
       {isLoading ? <span className={styles.spinner} /> : children}
     </button>
   );

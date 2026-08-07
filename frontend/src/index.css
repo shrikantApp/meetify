@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@theme {
+  --color-sidebar: var(--slack-sidebar);
+  --color-sidebar-text: var(--slack-sidebar-text);
+  --color-primary: var(--slack-primary);
+  --color-primary-text: var(--slack-primary-text);
+  --color-active: var(--slack-active);
+  --color-hover: var(--slack-hover);
+  --color-border: var(--slack-border);
+  --color-background: var(--slack-bg);
+  --color-text: var(--slack-text);
+  --color-text-muted: var(--slack-text-muted);
+}
 /* ─── VIDEO COMPONENT STYLES ─────────────────────────────────────────────── */
 .localVideo,
 .remoteVideo {
@@ -71,6 +83,9 @@
   --slack-text-muted: #94a3b8;
   --slack-border: rgba(255, 255, 255, 0.05);
   --slack-active: #6366f1;
+  /* Text colors for elements placed ON TOP of primary/sidebar backgrounds */
+  --slack-primary-text: #ffffff;
+  --slack-sidebar-text: #ffffff;
 }
 
 .light,
@@ -79,7 +94,8 @@
   --bg-base: var(--slack-bg, #ffffff);
   --bg-sidebar: var(--slack-sidebar, #f8f9fa);
   --bg-workspace: var(--slack-sidebar, #f8f9fa);
-  --bg-card: var(--slack-bg, #ffffff);
+  --bg-card-body: rgba(255, 255, 255, 1);
+  --bg-card: rgba(255, 255, 255, 0.9);
   --bg-card-hover: var(--slack-hover, #f1f3f5);
   --surface-soft: rgba(29, 28, 29, 0.04);
   --surface-soft-hover: rgba(29, 28, 29, 0.08);
@@ -96,12 +112,19 @@
   --border-subtle: var(--slack-border, #e2e2e2);
   --border-medium: var(--slack-border, #d1d1d1);
 
+  --shadow-premium: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
+
   --slack-bg: #ffffff;
-  --slack-sidebar: #3f0e40;
+  --slack-sidebar: #f8f8f8;
   --slack-text: #1d1c1d;
   --slack-text-muted: #616061;
   --slack-border: #e2e2e2;
   --slack-active: #1164a3;
+  --slack-hover: #f0f0f0;
+  --slack-input-bg: #ffffff;
+  /* For light preset, text on primary/sidebar is dark */
+  --slack-primary-text: #1d1c1d;
+  --slack-sidebar-text: #1d1c1d;
 }
 
 body {
@@ -177,7 +200,7 @@ body {
   gap: 0.75rem;
   padding: 0.65rem 0.75rem;
   border-radius: 0.625rem;
-  color: var(--text-secondary);
+  color: var(--slack-sidebar-text);
   font-size: 0.92rem;
   font-weight: 700;
   transition: background-color 0.18s ease, color 0.18s ease;
@@ -185,7 +208,7 @@ body {
 
 .preferences-nav-item:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
+  color: var(--slack-sidebar-text);
 }
 
 .preferences-nav-item-active {
@@ -243,7 +266,7 @@ body {
 .preferences-segment-active {
   border-color: var(--accent-primary);
   background: rgba(17, 100, 163, 0.14);
-  color: #ffffff;
+  color: var(--slack-text);
 }
 
 .preferences-theme-card {

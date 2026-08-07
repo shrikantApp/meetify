@@ -39,10 +39,8 @@ const SIGNALING_DEBUG = import.meta.env.VITE_DEBUG_SIGNALING === 'true';
 function debugLog(message: string, payload?: unknown) {
     if (!SIGNALING_DEBUG) return;
     if (payload !== undefined) {
-        console.log(message, payload);
         return;
     }
-    console.log(message);
 }
 
 // ── TYPE DEFINITIONS ─────────────────────────────────────────────────────────

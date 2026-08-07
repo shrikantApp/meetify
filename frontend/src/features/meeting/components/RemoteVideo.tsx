@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 interface RemoteVideoProps {
-    stream: MediaStream;
-    className?: string;
-    isScreenShare?: boolean;
+  stream: MediaStream;
+  className?: string;
+  isScreenShare?: boolean;
 }
 
 /**
@@ -12,25 +12,28 @@ interface RemoteVideoProps {
  * Renders remote participant streams or screen shares.
  * Screen shares and remote peers are NEVER mirrored.
  */
-export default function RemoteVideo({ stream, className = "", isScreenShare }: RemoteVideoProps) {
-    const videoRef = useRef<HTMLVideoElement>(null);
+export default function RemoteVideo({
+  stream,
+  className = "",
+  isScreenShare,
+}: RemoteVideoProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-    useEffect(() => {
-        if (videoRef.current && stream) {
-            console.log(`[WebRTC] RemoteVideo updating srcObject for ${isScreenShare ? 'ScreenShare' : 'Camera'}`);
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(err => {
-                console.warn('[WebRTC] RemoteVideo autoplay failed:', err);
-            });
-        }
-    }, [stream, isScreenShare]);
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch((err) => {
+        console.warn("[WebRTC] RemoteVideo autoplay failed:", err);
+      });
+    }
+  }, [stream, isScreenShare]);
 
-    return (
-        <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className={`remoteVideo ${isScreenShare ? 'screenShare' : ''} ${className}`}
-        />
-    );
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      className={`remoteVideo ${isScreenShare ? "screenShare" : ""} ${className}`}
+    />
+  );
 }

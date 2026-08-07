@@ -22,6 +22,7 @@ interface MeetingControlsProps {
     onPauseRecording: () => void;
     onResumeRecording: () => void;
     onLeave: () => void;
+    unreadCount?: number;
 }
 
 export default function MeetingControls({
