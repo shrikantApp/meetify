@@ -27,6 +27,7 @@ export interface RoomSettings {
     hostSocketId: string;
     hostUserId: string;
     coHostSocketIds: Set<string>;
+    chatPermission?: 'everyone' | 'host-only' | 'disabled';
 }
 
 /** Lobby-related payloads sent over socket.io. */
@@ -65,12 +66,14 @@ export type HostActionType =
     | 'unlock-room'
     | 'end-meeting'
     | 'recording-start'
-    | 'recording-stop';
+    | 'recording-stop'
+    | 'set-chat-permission';
 
 export interface HostActionPayload {
     roomId: string;
     action: HostActionType;
     targetSocketId?: string;
+    chatPermission?: 'everyone' | 'host-only' | 'disabled';
 }
 
 export type ParticipantActionType = 'mute' | 'stop-video' | 'remove';

@@ -6,11 +6,19 @@ import { Meeting } from './entities/meeting.entity';
 import { MeetingParticipant } from './entities/meeting-participant.entity';
 
 import { MeetingRecording } from './entities/meeting-recording.entity';
+import { MeetingChatMessage } from './entities/meeting-chat-message.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Meeting, MeetingParticipant, MeetingRecording])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Meeting,
+      MeetingParticipant,
+      MeetingRecording,
+      MeetingChatMessage,
+    ]),
+  ],
   controllers: [MeetingsController],
   providers: [MeetingsService],
   exports: [MeetingsService],
 })
-export class MeetingsModule { }
+export class MeetingsModule {}

@@ -64,7 +64,17 @@ type TargetPayload = { targetSocketId: string };
 type OfferPayload = TargetPayload & { sdp: RTCSessionDescriptionInit };
 type AnswerPayload = TargetPayload & { sdp: RTCSessionDescriptionInit };
 type IcePayload = TargetPayload & { candidate: RTCIceCandidateInit };
-type ChatPayload = { roomId?: string; message: string; userName?: string };
+type ChatPayload = {
+  roomId?: string;
+  message: string;
+  userName?: string;
+  type?: 'text' | 'file' | 'image' | 'system' | 'code';
+  fileUrl?: string;
+  fileType?: string;
+  recipientSocketId?: string;
+  recipientUserId?: string;
+  channel?: 'everyone' | 'host-only' | 'direct';
+};
 type MediaStatePayload = { roomId: string; type: MediaType; enabled: boolean };
 type ScreenShareStartPayload = { roomId: string };
 type ScreenShareStopPayload = { roomId: string; isCamOn: boolean };
@@ -158,7 +168,6 @@ export class EventsGateway
   private logDebug(message: string, context?: Record<string, unknown>) {
     if (!this.isDebugEnabled()) return;
     const details = context ? ` ${JSON.stringify(context)}` : '';
-    console.log(`[signaling] ${message}${details}`);
   }
 
   // ── AUDIT ────────────────────────────────────────────────────────────
@@ -974,6 +983,18 @@ export class EventsGateway
         break;
       }
 
+      case 'set-chat-permission': {
+        const currentSettings = this.roomSettings.get(data.roomId);
+        if (currentSettings && data.chatPermission) {
+          currentSettings.chatPermission = data.chatPermission;
+          this.server.to(data.roomId).emit('chat-permission-changed', {
+            chatPermission: data.chatPermission,
+            setBy: client.id,
+          });
+        }
+        break;
+      }
+
       case 'remove-participant': {
         if (!data.targetSocketId) return;
         const targetSocket = this.server.sockets.get(data.targetSocketId);
@@ -1223,27 +1244,96 @@ export class EventsGateway
   // ══════════════════════════════════════════════════════════════════════
 
   @SubscribeMessage('chat-message')
-  handleChatMessage(
+  async handleChatMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ChatPayload,
   ) {
     const participant = this.getParticipant(client, 'chat-message');
     if (!participant) return;
 
-    if (data.roomId && data.roomId !== participant.roomId) {
+    const roomId = participant.roomId;
+    if (data.roomId && data.roomId !== roomId) {
       this.logDebug('chat room mismatch', {
         socketId: client.id,
         sentRoom: data.roomId,
-        actualRoom: participant.roomId,
+        actualRoom: roomId,
       });
       return;
     }
 
-    this.server.to(participant.roomId).emit('chat-message', {
+    const settings = this.roomSettings.get(roomId);
+    const isHostOrCo = this.isHostOrCoHost(client.id, roomId);
+
+    // Host permission checks
+    if (settings?.chatPermission === 'disabled' && !isHostOrCo) {
+      client.emit('chat-error', { message: 'Chat is currently disabled by host.' });
+      return;
+    }
+
+    let channel = data.channel || 'everyone';
+    if (settings?.chatPermission === 'host-only' && !isHostOrCo) {
+      channel = 'host-only';
+    }
+
+    let targetUserId = data.recipientUserId;
+    if (data.recipientSocketId && !targetUserId) {
+      const targetP = this.getParticipant({ id: data.recipientSocketId } as Socket, 'chat-message');
+      if (targetP) targetUserId = targetP.userId;
+    }
+
+    // Persist to database
+    let persistedId: string | undefined;
+    try {
+      const saved = await this.meetingsService.saveChatMessage({
+        meetingCode: roomId,
+        senderId: participant.userId,
+        senderName: participant.userName,
+        content: data.message,
+        type: data.type || 'text',
+        fileUrl: data.fileUrl,
+        fileType: data.fileType,
+        recipientUserId: targetUserId,
+        channel,
+      });
+      persistedId = saved.id;
+    } catch (e: any) {
+      this.logDebug('failed to persist chat message', { error: e.message });
+    }
+
+    const messagePayload = {
+      id: persistedId || `temp-${Date.now()}`,
       message: data.message,
       userName: participant.userName,
+      senderId: participant.userId,
+      senderSocketId: client.id,
       timestamp: new Date().toISOString(),
-    });
+      type: data.type || 'text',
+      fileUrl: data.fileUrl,
+      fileType: data.fileType,
+      recipientSocketId: data.recipientSocketId,
+      recipientUserId: targetUserId,
+      channel,
+    };
+
+    if (data.recipientSocketId) {
+      // 1:1 Direct Message
+      this.server.to(data.recipientSocketId).emit('chat-message', messagePayload);
+      client.emit('chat-message', messagePayload);
+    } else if (channel === 'host-only') {
+      // Send to host, co-hosts, and sender
+      if (settings?.hostSocketId) {
+        this.server.to(settings.hostSocketId).emit('chat-message', messagePayload);
+      }
+      for (const coHostId of settings?.coHostSocketIds || []) {
+        this.server.to(coHostId).emit('chat-message', messagePayload);
+      }
+      if (!isHostOrCo) {
+        client.emit('chat-message', messagePayload);
+      }
+    } else {
+      // Broadcast to everyone in room
+      this.server.to(roomId).emit('chat-message', messagePayload);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════

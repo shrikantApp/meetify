@@ -4,6 +4,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Meeting } from './entities/meeting.entity';
 import { MeetingParticipant } from './entities/meeting-participant.entity';
+import {
+  MeetingChatMessage,
+  ChatMessageType,
+  ChatMessageChannel,
+} from './entities/meeting-chat-message.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 
@@ -14,6 +19,8 @@ export class MeetingsService {
     private meetingRepo: Repository<Meeting>,
     @InjectRepository(MeetingParticipant)
     private participantRepo: Repository<MeetingParticipant>,
+    @InjectRepository(MeetingChatMessage)
+    private chatMessageRepo: Repository<MeetingChatMessage>,
   ) {}
 
   /** Generate a unique 8-character alphanumeric meeting code */
@@ -137,5 +144,77 @@ export class MeetingsService {
     }
     meeting.endedAt = new Date();
     return this.meetingRepo.save(meeting);
+  }
+
+  async saveChatMessage(data: {
+    meetingCode: string;
+    senderId?: string;
+    senderName: string;
+    senderAvatar?: string;
+    content: string;
+    type?: ChatMessageType;
+    fileUrl?: string;
+    fileType?: string;
+    recipientUserId?: string;
+    channel?: ChatMessageChannel;
+  }): Promise<MeetingChatMessage> {
+    const meeting = await this.meetingRepo.findOne({
+      where: { meetingCode: data.meetingCode },
+    });
+    if (!meeting) {
+      throw new NotFoundException(`Meeting not found: ${data.meetingCode}`);
+    }
+
+    const msg = this.chatMessageRepo.create({
+      meetingId: meeting.id,
+      senderId: data.senderId,
+      senderName: data.senderName,
+      senderAvatar: data.senderAvatar,
+      content: data.content,
+      type: data.type || 'text',
+      fileUrl: data.fileUrl,
+      fileType: data.fileType,
+      recipientUserId: data.recipientUserId,
+      channel: data.channel || 'everyone',
+    });
+
+    return this.chatMessageRepo.save(msg);
+  }
+
+  async getMeetingMessages(
+    meetingCode: string,
+    userId: string,
+    limit = 100,
+    offset = 0,
+  ): Promise<MeetingChatMessage[]> {
+    const meeting = await this.meetingRepo.findOne({
+      where: { meetingCode },
+      relations: ['host'],
+    });
+    if (!meeting) {
+      throw new NotFoundException(`Meeting not found: ${meetingCode}`);
+    }
+
+    const isHost = meeting.host?.id === userId;
+
+    const qb = this.chatMessageRepo
+      .createQueryBuilder('msg')
+      .where('msg.meeting_id = :meetingId', { meetingId: meeting.id });
+
+    // Filter private DMs and host-only channels
+    qb.andWhere(
+      '(msg.channel = :everyone OR (msg.channel = :hostOnly AND :isHost = true) OR (msg.channel = :direct AND (msg.sender_id = :userId OR msg.recipient_user_id = :userId)))',
+      {
+        everyone: 'everyone',
+        hostOnly: 'host-only',
+        direct: 'direct',
+        isHost,
+        userId,
+      },
+    );
+
+    qb.orderBy('msg.created_at', 'ASC').skip(offset).take(limit);
+
+    return qb.getMany();
   }
 }

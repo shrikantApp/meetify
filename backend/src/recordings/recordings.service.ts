@@ -30,7 +30,6 @@ export class RecordingsService {
             const filePath = path.join(meetingId, fileName);
             const absolutePath = path.join(this.recordingsPath, filePath);
 
-            console.log(`[RecordingsService] Saving file to ${absolutePath}`);
             fs.writeFileSync(absolutePath, file.buffer);
 
             const recording = this.recordingsRepository.create({
@@ -42,7 +41,6 @@ export class RecordingsService {
             });
 
             const saved = await this.recordingsRepository.save(recording);
-            console.log(`[RecordingsService] Saved metadata to DB with ID: ${saved.id}`);
             return saved;
         } catch (err) {
             console.error('[RecordingsService] Error saving recording:', err);
