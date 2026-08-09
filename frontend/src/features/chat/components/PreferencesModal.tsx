@@ -628,7 +628,7 @@ export function PreferencesModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 12 }}
             transition={{ duration: 0.2 }}
-            className="preferences-modal relative z-10 flex h-[min(92vh,760px)] w-full max-w-6xl overflow-hidden rounded-[22px] border border-[var(--border-medium)]"
+            className="preferences-modal relative z-10 flex h-[min(92vh,760px)] w-full max-w-6xl overflow-hidden rounded-[22px] border border-white/10"
           >
             <aside className="bg-sidebar w-full max-w-[260px] flex-shrink-0 border-r border-[var(--border-subtle)] px-4 py-5">
               <h2 className="px-3 text-[30px] font-black tracking-tight text-sidebar-text">
