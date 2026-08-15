@@ -145,6 +145,7 @@ export function ChatWindow({ conversationId, onOpenThread }: Props) {
           <div className="h-4 flex-shrink-0" />
         </div>
       </div>
+      {console.log("topLevelMessages", topLevelMessages)}
 
       {!isAtBottom && topLevelMessages.length > 5 && (
         <motion.button

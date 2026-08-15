@@ -1,7 +1,16 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { useAppDispatch, useAppSelector } from '../../../redux/store';
-import { useMessageQueue } from '../../../hooks/useMessageQueue';
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-refresh/only-export-components */
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { io, Socket } from "socket.io-client";
+import { useAppDispatch, useAppSelector } from "../../../redux/store";
+import { useMessageQueue } from "../../../hooks/useMessageQueue";
 import {
   setSocketStatus,
   addMessage,
@@ -13,8 +22,8 @@ import {
   updateReactions,
   setTyping,
   updatePresence,
-} from '../../../redux/chat/chatSlice';
-import { editMessage } from '../../../redux/chat/chatThunks';
+} from "../../../redux/chat/chatSlice";
+import { editMessage } from "../../../redux/chat/chatThunks";
 
 interface ChatSocketContextType {
   socket: Socket | null;
@@ -22,32 +31,44 @@ interface ChatSocketContextType {
   emit: (event: string, data: any) => void;
 }
 
-const ChatSocketContext = createContext<ChatSocketContextType | undefined>(undefined);
+const ChatSocketContext = createContext<ChatSocketContextType | undefined>(
+  undefined,
+);
 
 const CHAT_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace('/api', '/chat')
-  : 'http://localhost:4008/chat';
+  ? import.meta.env.VITE_API_URL.replace("/api", "/chat")
+  : "http://localhost:4008/chat";
 
-export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const dispatch = useAppDispatch();
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { queue, dequeue, incrementRetry } = useMessageQueue();
 
   const token = useAppSelector((state) => state.auth.currentUser.access_token);
-  const activeConversationId = useAppSelector((state) => state.chat.activeConversationId);
+  const activeConversationId = useAppSelector(
+    (state) => state.chat.activeConversationId,
+  );
   const currentUser = useAppSelector((state) => state.auth.userProfile);
   const allMessages = useAppSelector((state) => state.chat.messages);
 
   const activeConvIdRef = useRef(activeConversationId);
   const currentUserRef = useRef(currentUser);
 
-  useEffect(() => { activeConvIdRef.current = activeConversationId; }, [activeConversationId]);
-  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+  useEffect(() => {
+    activeConvIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   useEffect(() => {
     if (socketRef.current?.connected && activeConversationId) {
-      socketRef.current.emit('join_conversation', { conversationId: activeConversationId });
+      socketRef.current.emit("join_conversation", {
+        conversationId: activeConversationId,
+      });
     }
   }, [activeConversationId, isConnected]);
 
@@ -57,14 +78,16 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const messages = allMessages[activeConversationId] || [];
       const lastMessage = messages[messages.length - 1];
       if (lastMessage && lastMessage.senderId !== currentUser.id) {
-        socketRef.current.emit('message_read', {
+        socketRef.current.emit("message_read", {
           conversationId: activeConversationId,
-          lastMessageId: lastMessage.id
+          lastMessageId: lastMessage.id,
         });
-        dispatch(markConversationRead({
-          conversationId: activeConversationId,
-          userId: currentUser.id
-        }));
+        dispatch(
+          markConversationRead({
+            conversationId: activeConversationId,
+            userId: currentUser.id,
+          }),
+        );
       }
     }
   }, [activeConversationId, dispatch, currentUser, allMessages]);
@@ -76,7 +99,7 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         socketRef.current = null;
       }
       setIsConnected(false);
-      dispatch(setSocketStatus('disconnected'));
+      dispatch(setSocketStatus("disconnected"));
       return;
     }
 
@@ -89,53 +112,76 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    socket.on("connect", () => {
       setIsConnected(true);
-      dispatch(setSocketStatus('connected'));
+      dispatch(setSocketStatus("connected"));
       // Process queue
-      queue.forEach(msg => {
-        socket.emit('send_message', msg);
+      queue.forEach((msg) => {
+        socket.emit("send_message", msg);
         incrementRetry(msg.tempId);
       });
     });
 
-    socket.on('disconnect', () => {
+    socket.on("disconnect", () => {
       setIsConnected(false);
-      dispatch(setSocketStatus('disconnected'));
+      dispatch(setSocketStatus("disconnected"));
     });
 
-    socket.on('receive_message', (msg) => {
+    socket.on("receive_message", (msg) => {
       dispatch(addMessage(msg));
       const activeId = activeConvIdRef.current;
       const me = currentUserRef.current;
       if (activeId === msg.conversationId && msg.senderId !== me?.id) {
-        socket.emit('message_read', { conversationId: msg.conversationId, lastMessageId: msg.id });
-        dispatch(markConversationRead({ conversationId: msg.conversationId, userId: me?.id || '' }));
+        socket.emit("message_read", {
+          conversationId: msg.conversationId,
+          lastMessageId: msg.id,
+        });
+        dispatch(
+          markConversationRead({
+            conversationId: msg.conversationId,
+            userId: me?.id || "",
+          }),
+        );
       } else if (msg.senderId !== me?.id) {
-        dispatch(incrementConversationUnread({ conversationId: msg.conversationId }));
+        dispatch(
+          incrementConversationUnread({ conversationId: msg.conversationId }),
+        );
       }
     });
 
-    socket.on('message_sent', ({ tempId, messageId, conversationId }) => {
+    socket.on("message_sent", ({ tempId, messageId, conversationId }) => {
       dispatch(confirmMessage({ tempId, messageId, conversationId }));
       dequeue(tempId);
     });
 
-    socket.on('message_delivered', (data) => dispatch(updateMessageStatus({ ...data, status: 'delivered' })));
-    socket.on('messages_read', (data) => dispatch(updateMessageStatus({ ...data, status: 'read' })));
-    socket.on('message_edited', (msg) => dispatch(editMessage.fulfilled(msg, '', { messageId: msg.id, content: msg.content })));
-    socket.on('message_deleted', (data) => dispatch(deleteMessage(data)));
-    socket.on('typing_indicator', (data) => dispatch(setTyping(data)));
-    socket.on('reaction_updated', (data) => dispatch(updateReactions(data)));
-    socket.on('presence_update', (data) => dispatch(updatePresence(data)));
+    socket.on("message_delivered", (data) =>
+      dispatch(updateMessageStatus({ ...data, status: "delivered" })),
+    );
+    socket.on("messages_read", (data) =>
+      dispatch(updateMessageStatus({ ...data, status: "read" })),
+    );
+    socket.on("message_edited", (msg) =>
+      dispatch(
+        editMessage.fulfilled(msg, "", {
+          messageId: msg.id,
+          content: msg.content,
+        }),
+      ),
+    );
+    socket.on("message_deleted", (data) => dispatch(deleteMessage(data)));
+    socket.on("typing_indicator", (data) => dispatch(setTyping(data)));
+    socket.on("reaction_updated", (data) => dispatch(updateReactions(data)));
+    socket.on("presence_update", (data) => dispatch(updatePresence(data)));
 
-    socket.on('incoming_call', ({ callerName, meetingCode }) => {
+    socket.on("incoming_call", ({ callerName, meetingCode }) => {
       if (window.confirm(`${callerName} is calling you! Join the meeting?`)) {
-        window.open(`/meeting/${meetingCode}`, '_blank');
+        window.open(`/meeting/${meetingCode}`, "_blank");
       }
     });
 
-    const hb = setInterval(() => { if (socket.connected) socket.emit('heartbeat'); }, 60000);
+    const hb = setInterval(() => {
+      if (socket.connected) socket.emit("heartbeat");
+    }, 60000);
 
     return () => {
       clearInterval(hb);
@@ -151,7 +197,9 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   return (
-    <ChatSocketContext.Provider value={{ socket: socketRef.current, isConnected, emit }}>
+    <ChatSocketContext.Provider
+      value={{ socket: socketRef.current, isConnected, emit }}
+    >
       {children}
     </ChatSocketContext.Provider>
   );
@@ -159,6 +207,9 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 export const useChatSocketContext = () => {
   const context = useContext(ChatSocketContext);
-  if (!context) throw new Error('useChatSocketContext must be used within a ChatSocketProvider');
+  if (!context)
+    throw new Error(
+      "useChatSocketContext must be used within a ChatSocketProvider",
+    );
   return context;
 };

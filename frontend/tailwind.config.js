@@ -18,16 +18,26 @@ export default {
                         // Slack theme variables
                 sidebar: "var(--slack-sidebar)",
                 "sidebar-text": "var(--slack-sidebar-text)",
-                primary: "var(--slack-primary)",
-                "primary-text": "var(--slack-primary-text)",
+                primary: {
+                    DEFAULT: "var(--slack-primary)",
+                    foreground: "var(--slack-primary-text)",
+                },
+                sidebar: {
+                    DEFAULT: "var(--slack-sidebar)",
+                    foreground: "var(--slack-sidebar-text)",
+                    hover: "var(--slack-sidebar-hover)",
+                },
+                active: {
+                    DEFAULT: "var(--slack-active)",
+                    bg: "var(--slack-active-bg)",
+                },
                 active: "var(--slack-active)",
                 hover: "var(--slack-hover)",
                 border: "var(--slack-border)",
                 background: "var(--slack-bg)",
                 text: "var(--slack-text)",
                 "text-muted": "var(--slack-text-muted)",
-                notification: "var(--slack-notification)",
-                presence: "var(--slack-accent)",
+                notification: "var(--slack-notification)"
             },
         },
     },

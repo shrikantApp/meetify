@@ -244,7 +244,7 @@ export function MessageBubble({
 
       {/* Hover Action Menu */}
       <div className="absolute right-6 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-150 z-30">
-        <div className="flex items-center gap-0.5 p-1 glass-morphism rounded-xl premium-shadow border border-[var(--border-medium)] bg-[var(--bg-sidebar)]/80">
+        <div className="flex items-center gap-0.5 p-1 glass-morphism !bg-white/10 rounded-xl premium-shadow border border-[var(--border-medium)] bg-[var(--bg-sidebar)]/80">
           <div className="relative" ref={emojiPickerRef}>
             <ActionButton
               icon={<Smile className="w-4 h-4" />}

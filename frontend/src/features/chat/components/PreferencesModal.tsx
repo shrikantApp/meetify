@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -129,7 +131,7 @@ export function PreferencesModal({
     currentMember?.role === "owner" || workspace?.currentUserRole === "owner";
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || activeSection) return;
     setActiveSection(initialSection);
   }, [initialSection, isOpen]);
 
@@ -209,7 +211,7 @@ export function PreferencesModal({
             { id: "light", label: "Light", icon: Sun },
             { id: "dark", label: "Dark", icon: Moon },
             { id: "system", label: "System", icon: Monitor },
-          ].map(({ id, label, icon: Icon }) => (
+          ].map?.(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setMode(id as ThemeMode)}
@@ -249,24 +251,26 @@ export function PreferencesModal({
               Object.entries(SLACK_THEMES) as Array<
                 [ThemePresetId, (typeof SLACK_THEMES)[ThemePresetId]]
               >
-            ).map(([id, theme]) => (
-              <button
-                key={id}
-                onClick={() => setPresetId(id)}
-                className={`preferences-theme-card ${presetId === id ? "preferences-theme-card-active" : ""}`}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="w-7 h-7 rounded-full border border-white/10"
-                    style={{ backgroundColor: theme.sidebar }}
-                  />
-                  <span className="font-semibold text-sm">{theme.label}</span>
-                </div>
-                {presetId === id ? (
-                  <Check className="w-4 h-4 text-[var(--accent-primary)]" />
-                ) : null}
-              </button>
-            ))}
+            )
+              ?.filter?.(([id]) => (mode == "dark" ? id !== "light" : true))
+              ?.map?.(([id, theme]) => (
+                <button
+                  key={id}
+                  onClick={() => setPresetId(id)}
+                  className={`preferences-theme-card ${presetId === id ? "preferences-theme-card-active" : ""}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="w-7 h-7 rounded-full border border-white/10"
+                      style={{ backgroundColor: theme.sidebar }}
+                    />
+                    <span className="font-semibold text-sm">{theme.label}</span>
+                  </div>
+                  {presetId === id ? (
+                    <Check className="w-4 h-4 text-[var(--accent-primary)]" />
+                  ) : null}
+                </button>
+              ))}
           </div>
         </div>
       ) : (
@@ -280,7 +284,7 @@ export function PreferencesModal({
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {CUSTOM_THEME_FIELDS.map(({ key, label }) => (
+            {CUSTOM_THEME_FIELDS.map?.(({ key, label }) => (
               <label key={key} className="preferences-color-card">
                 <span className="text-xs font-bold text-[var(--text-secondary)]">
                   {label}
@@ -386,7 +390,7 @@ export function PreferencesModal({
       {members.length === 0 ? (
         <EmptyState copy="No members loaded for this workspace yet." />
       ) : (
-        members.map((member) => (
+        members.map?.((member) => (
           <div key={member.id} className="preferences-list-item">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <div className="w-10 h-10 rounded-xl premium-gradient flex items-center justify-center text-sm font-bold text-white">
@@ -493,7 +497,7 @@ export function PreferencesModal({
         {invitations.length === 0 ? (
           <EmptyState copy="No pending invitations yet." />
         ) : (
-          invitations.map((invite) => (
+          invitations.map?.((invite) => (
             <div key={invite.id} className="preferences-list-item">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">
@@ -635,7 +639,7 @@ export function PreferencesModal({
                 Preferences
               </h2>
               <nav className="mt-5 space-y-1">
-                {SECTION_ITEMS.map(({ id, label, icon: Icon }) => (
+                {SECTION_ITEMS.map?.(({ id, label, icon: Icon }) => (
                   <button
                     key={id}
                     onClick={() => setActiveSection(id)}
